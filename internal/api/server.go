@@ -248,6 +248,11 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 
 	// Setup routes
 	s.setupRoutes()
+
+	// 当同时开启 claude2codex 与 codex2claude 时给出一次启动日志, 说明仅前者生效
+	if cfg != nil && cfg.SDKConfig.Claude2Codex && cfg.SDKConfig.Codex2Claude {
+		log.Warn("Both claude2codex and codex2claude are enabled; only claude2codex will take effect.")
+	}
 	if optionState.routerConfigurator != nil {
 		optionState.routerConfigurator(engine, s.handlers, cfg)
 	}

@@ -9,11 +9,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/interfaces"
+	. "github.com/router-for-me/CLIProxyAPI/v6/internal/constant"
+	conversation "github.com/router-for-me/CLIProxyAPI/v6/internal/provider/gemini-web/conversation"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/util"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
 	coreexecutor "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/executor"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/config"
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v6/sdk/translator"
+	"github.com/tidwall/sjson"
 	"golang.org/x/net/context"
 )
 
@@ -135,6 +138,20 @@ func (h *BaseAPIHandler) GetContextWithCancel(handler interfaces.APIHandler, c *
 func (h *BaseAPIHandler) ExecuteWithAuthManager(ctx context.Context, handlerType, modelName string, rawJSON []byte, alt string) ([]byte, *interfaces.ErrorMessage) {
 	normalizedModel, metadata := normalizeModelMetadata(modelName)
 	providers := util.GetProviderName(normalizedModel)
+    // 先按开关重写模型名(目标直通优先), 再决定 provider
+    if handlerType == Claude && h.Cfg != nil && h.Cfg.Claude2Codex {
+        if mapped, changed := util.EnsureModelForTarget(Codex, modelName); changed {
+            modelName = mapped
+            if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil { rawJSON = b }
+        }
+    } else if handlerType == OpenaiResponse && h.Cfg != nil && h.Cfg.Codex2Claude && !h.Cfg.Claude2Codex {
+        if mapped, changed := util.EnsureModelForTarget(Claude, modelName); changed {
+            modelName = mapped
+            if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil { rawJSON = b }
+        }
+    }
+    providers := util.GetProviderName(modelName)
+    providers = h.overrideProvidersBySwitch(handlerType, providers)
 	if len(providers) == 0 {
 		return nil, &interfaces.ErrorMessage{StatusCode: http.StatusBadRequest, Error: fmt.Errorf("unknown provider for model %s", modelName)}
 	}
@@ -221,6 +238,20 @@ func (h *BaseAPIHandler) ExecuteCountWithAuthManager(ctx context.Context, handle
 func (h *BaseAPIHandler) ExecuteStreamWithAuthManager(ctx context.Context, handlerType, modelName string, rawJSON []byte, alt string) (<-chan []byte, <-chan *interfaces.ErrorMessage) {
 	normalizedModel, metadata := normalizeModelMetadata(modelName)
 	providers := util.GetProviderName(normalizedModel)
+    // 先按开关重写模型名(目标直通优先), 再决定 provider
+    if handlerType == Claude && h.Cfg != nil && h.Cfg.Claude2Codex {
+        if mapped, changed := util.EnsureModelForTarget(Codex, modelName); changed {
+            modelName = mapped
+            if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil { rawJSON = b }
+        }
+    } else if handlerType == OpenaiResponse && h.Cfg != nil && h.Cfg.Codex2Claude && !h.Cfg.Claude2Codex {
+        if mapped, changed := util.EnsureModelForTarget(Claude, modelName); changed {
+            modelName = mapped
+            if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil { rawJSON = b }
+        }
+    }
+    providers := util.GetProviderName(modelName)
+    providers = h.overrideProvidersBySwitch(handlerType, providers)
 	if len(providers) == 0 {
 		errChan := make(chan *interfaces.ErrorMessage, 1)
 		errChan <- &interfaces.ErrorMessage{StatusCode: http.StatusBadRequest, Error: fmt.Errorf("unknown provider for model %s", modelName)}
@@ -327,6 +358,21 @@ func cloneMetadata(src map[string]any) map[string]any {
 		dst[k] = v
 	}
 	return dst
+}
+
+// overrideProvidersBySwitch 根据开关强制路由到指定提供方(仅非计数接口)
+func (h *BaseAPIHandler) overrideProvidersBySwitch(handlerType string, providers []string) []string {
+    if h == nil || h.Cfg == nil {
+        return providers
+    }
+    // 同时开启时, 仅 Claude2Codex 生效
+    if h.Cfg.Claude2Codex && handlerType == Claude {
+        return []string{Codex}
+    }
+    if h.Cfg.Codex2Claude && !h.Cfg.Claude2Codex && handlerType == OpenaiResponse {
+        return []string{Claude}
+    }
+    return providers
 }
 
 // WriteErrorResponse writes an error message to the response writer using the HTTP status embedded in the message.
