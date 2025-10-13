@@ -17,6 +17,11 @@ type SDKConfig struct {
 
 	// Access holds request authentication provider configuration.
 	Access AccessConfig `yaml:"auth,omitempty" json:"auth,omitempty"`
+
+    // Claude2Codex 开关: 当为 true 时, 将 Claude API 请求路由到 Codex
+    Claude2Codex bool `yaml:"claude2codex" json:"claude2codex"`
+    // Codex2Claude 开关: 当为 true 时, 将 Codex(OpenAI Responses) API 请求路由到 Claude
+    Codex2Claude bool `yaml:"codex2claude" json:"codex2claude"`
 }
 
 // AccessConfig groups request authentication providers.

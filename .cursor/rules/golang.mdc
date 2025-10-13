@@ -1,0 +1,45 @@
+---
+alwaysApply: true
+---
+
+# Repository Guidelines
+
+## Project Structure & Module Organization
+- `cmd/server`: main entry for the server (`go run ./cmd/server`).
+- `internal`: core packages (auth, provider, logging, cmd, config, util).
+- `sdk`: API handlers and access manager used by proxy endpoints.
+- `examples`: minimal client examples (Go).
+- `docs`, `static`: documentation and static assets.
+- Runtime data: `auths/`, `logs/`, `conv/` (git-ignored). Config lives in `config.yaml` (copy from `config.example.yaml`).
+
+## Build, Test, and Development Commands
+- Prepare config: `cp config.example.yaml config.yaml` (edit secrets locally).
+- Run locally: `go run ./cmd/server --config config.yaml`.
+- Build binary: `go build -o cli-proxy-api ./cmd/server`.
+- Docker (dev): `docker-compose up -d` (maps ports and mounts config/auths/logs/conv).
+- Format/Vet: `gofmt -s -w .` and `go vet ./...`.
+- Release (snapshot): `goreleaser release --snapshot --skip-publish --clean`.
+
+## Coding Style & Naming Conventions
+- Go version: declared in `go.mod` (use matching local toolchain).
+- Formatting: required `gofmt`; prefer grouped imports (std, third-party, local).
+- Naming: exported `UpperCamelCase`, unexported `lowerCamelCase`; avoid underscores.
+- Errors: wrap with context; log via `internal/logging` helpers.
+- HTTP handlers: keep thin; place business logic in `internal/*` or `sdk/*` packages.
+
+## Testing Guidelines
+- Framework: Go `testing`. Place tests near code as `*_test.go`.
+- Run: `go test ./... -v -race -cover`.
+- Focus: authentication flows, provider handlers, config parsing, logging paths.
+- Table-driven tests for handlers/util; aim for meaningful coverage over lines.
+
+## Commit & Pull Request Guidelines
+- Commit style: Conventional Commits (e.g., `feat(auth): add per-key proxy` or `fix(gemini-web): correct history reuse`).
+- PRs must include: clear description, linked issues, reproduction/validation steps, and config changes (snippets from `config.example.yaml` if applicable).
+- Update docs when flags/endpoints/config keys change; note any Docker port or volume impacts.
+
+## Security & Configuration Tips
+- Do not commit secrets; keep them in local `config.yaml` and `auths/` (both git-ignored).
+- Prefer environment-specific overrides outside the repo; review `docker-compose.yml` mappings.
+- Rotate credentials used for providers; validate logs are written to `logs/` and not stdout in production.
+

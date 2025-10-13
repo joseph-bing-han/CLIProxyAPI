@@ -51,6 +51,11 @@ request-retry: 3
 # Maximum wait time in seconds for a cooled-down credential before triggering a retry.
 max-retry-interval: 30
 
+# Route all Claude API calls to Codex when true (default: false)
+claude2codex: false
+# Route all Codex (OpenAI Responses) API calls to Claude when true (default: false)
+codex2claude: false
+
 # Quota exceeded behavior
 quota-exceeded:
   switch-project: true # Whether to automatically switch to another project when a quota is exceeded
