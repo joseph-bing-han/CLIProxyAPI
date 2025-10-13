@@ -38,6 +38,11 @@ proxy-url: ""
 # Number of times to retry a request. Retries will occur if the HTTP response code is 403, 408, 500, 502, 503, or 504.
 request-retry: 3
 
+# Route all Claude API calls to Codex when true (default: false)
+claude2codex: false
+# Route all Codex (OpenAI Responses) API calls to Claude when true (default: false)
+codex2claude: false
+
 # Quota exceeded behavior
 quota-exceeded:
   switch-project: true # Whether to automatically switch to another project when a quota is exceeded

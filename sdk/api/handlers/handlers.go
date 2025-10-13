@@ -10,11 +10,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/interfaces"
+	. "github.com/router-for-me/CLIProxyAPI/v6/internal/constant"
+	conversation "github.com/router-for-me/CLIProxyAPI/v6/internal/provider/gemini-web/conversation"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/util"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
 	coreexecutor "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/executor"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/config"
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v6/sdk/translator"
+	"github.com/tidwall/sjson"
 	"golang.org/x/net/context"
 )
 
@@ -138,10 +141,28 @@ func (h *BaseAPIHandler) GetContextWithCancel(handler interfaces.APIHandler, c *
 // ExecuteWithAuthManager executes a non-streaming request via the core auth manager.
 // This path is the only supported execution route.
 func (h *BaseAPIHandler) ExecuteWithAuthManager(ctx context.Context, handlerType, modelName string, rawJSON []byte, alt string) ([]byte, *interfaces.ErrorMessage) {
+	// 开关下优先重写目标模型名并同步请求体
+	if h != nil && h.Cfg != nil {
+		if handlerType == Claude && h.Cfg.Claude2Codex {
+			if mapped, changed := util.EnsureModelForTarget(Codex, modelName); changed {
+				modelName = mapped
+				if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil { rawJSON = b }
+			}
+		} else if handlerType == OpenaiResponse && h.Cfg.Codex2Claude && !h.Cfg.Claude2Codex {
+			if mapped, changed := util.EnsureModelForTarget(Claude, modelName); changed {
+				modelName = mapped
+				if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil { rawJSON = b }
+			}
+		}
+	}
+
 	providers, normalizedModel, metadata, errMsg := h.getRequestDetails(modelName)
 	if errMsg != nil {
 		return nil, errMsg
 	}
+	// 根据开关强制覆盖 provider 路由
+	providers = h.overrideProvidersBySwitch(handlerType, providers)
+
 	req := coreexecutor.Request{
 		Model:   normalizedModel,
 		Payload: cloneBytes(rawJSON),
@@ -222,6 +243,21 @@ func (h *BaseAPIHandler) ExecuteCountWithAuthManager(ctx context.Context, handle
 // ExecuteStreamWithAuthManager executes a streaming request via the core auth manager.
 // This path is the only supported execution route.
 func (h *BaseAPIHandler) ExecuteStreamWithAuthManager(ctx context.Context, handlerType, modelName string, rawJSON []byte, alt string) (<-chan []byte, <-chan *interfaces.ErrorMessage) {
+	// 开关下优先重写目标模型名并同步请求体
+	if h != nil && h.Cfg != nil {
+		if handlerType == Claude && h.Cfg.Claude2Codex {
+			if mapped, changed := util.EnsureModelForTarget(Codex, modelName); changed {
+				modelName = mapped
+				if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil { rawJSON = b }
+			}
+		} else if handlerType == OpenaiResponse && h.Cfg.Codex2Claude && !h.Cfg.Claude2Codex {
+			if mapped, changed := util.EnsureModelForTarget(Claude, modelName); changed {
+				modelName = mapped
+				if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil { rawJSON = b }
+			}
+		}
+	}
+
 	providers, normalizedModel, metadata, errMsg := h.getRequestDetails(modelName)
 	if errMsg != nil {
 		errChan := make(chan *interfaces.ErrorMessage, 1)
@@ -229,6 +265,9 @@ func (h *BaseAPIHandler) ExecuteStreamWithAuthManager(ctx context.Context, handl
 		close(errChan)
 		return nil, errChan
 	}
+	// 根据开关强制覆盖 provider 路由
+	providers = h.overrideProvidersBySwitch(handlerType, providers)
+
 	req := coreexecutor.Request{
 		Model:   normalizedModel,
 		Payload: cloneBytes(rawJSON),
@@ -297,7 +336,7 @@ func (h *BaseAPIHandler) ExecuteStreamWithAuthManager(ctx context.Context, handl
 func (h *BaseAPIHandler) getRequestDetails(modelName string) (providers []string, normalizedModel string, metadata map[string]any, err *interfaces.ErrorMessage) {
 	// Resolve "auto" model to an actual available model first
 	resolvedModelName := util.ResolveAutoModel(modelName)
-	
+
 	providerName, extractedModelName, isDynamic := h.parseDynamicModel(resolvedModelName)
 
 	// First, normalize the model name to handle suffixes like "-thinking-128"
@@ -384,6 +423,21 @@ func cloneMetadata(src map[string]any) map[string]any {
 		dst[k] = v
 	}
 	return dst
+}
+
+// overrideProvidersBySwitch 根据开关强制路由到指定提供方(仅非计数接口)
+func (h *BaseAPIHandler) overrideProvidersBySwitch(handlerType string, providers []string) []string {
+	if h == nil || h.Cfg == nil {
+		return providers
+	}
+	// 同时开启时, 仅 Claude2Codex 生效
+	if h.Cfg.Claude2Codex && handlerType == Claude {
+		return []string{Codex}
+	}
+	if h.Cfg.Codex2Claude && !h.Cfg.Claude2Codex && handlerType == OpenaiResponse {
+		return []string{Claude}
+	}
+	return providers
 }
 
 // WriteErrorResponse writes an error message to the response writer using the HTTP status embedded in the message.
