@@ -57,6 +57,26 @@ func GetProviderName(modelName string) []string {
 		return providers
 	}
 
+	// 启发式回退: 根据模型名推断提供方
+	lower := modelName
+	// 统一小写
+	if 'A' <= lower[0] && lower[0] <= 'Z' {
+		lower = strings.ToLower(lower)
+	} else {
+		// still ensure we have lowercased
+		lower = strings.ToLower(lower)
+	}
+	// 常见前缀判断
+	switch {
+	case strings.HasPrefix(lower, "gpt-") || strings.Contains(lower, "codex"):
+		appendProvider("codex")
+	case strings.HasPrefix(lower, "claude-"):
+		appendProvider("claude")
+	case strings.HasPrefix(lower, "gemini"):
+		appendProvider("gemini")
+	case strings.HasPrefix(lower, "qwen"):
+		appendProvider("qwen")
+	}
 	return providers
 }
 

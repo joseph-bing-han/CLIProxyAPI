@@ -5,6 +5,7 @@ import (
 
 	con "github.com/router-for-me/CLIProxyAPI/v6/internal/constant"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/registry"
+	sdkcfg "github.com/router-for-me/CLIProxyAPI/v6/sdk/config"
 )
 
 // TargetHasModel 判断目标提供方是否包含给定模型名, 优先使用运行时注册表, 其次使用静态清单
@@ -54,26 +55,28 @@ func EnsureModelForTarget(target, model string) (string, bool) {
 	t := strings.ToLower(strings.TrimSpace(target))
 	m := strings.ToLower(strings.TrimSpace(model))
 
-	// Claude -> Codex
+	// Claude -> Codex (静态默认)
 	claudeToCodex := map[string]string{
-		"claude-opus-4-1-20250805": "gpt-5-high",
+		"claude-opus-4-1-20250805":   "gpt-5-high",
 		"claude-sonnet-4-5-20250929": "gpt-5-medium",
 		"claude-sonnet-4-20250514":   "gpt-5-medium",
 		"claude-3-7-sonnet-20250219": "gpt-5-low",
 		"claude-3-5-haiku-20241022":  "gpt-5-minimal",
+		// 缺失映射补全：haiku-4-5-20251001 → gpt-5-minimal
+		"claude-haiku-4-5-20251001": "gpt-5-minimal",
 	}
 
-	// Codex -> Claude
+	// Codex -> Claude (静态默认)
 	codexToClaude := map[string]string{
-		"gpt-5-high":          "claude-opus-4-1-20250805",
-		"gpt-5-medium":        "claude-sonnet-4-5-20250929",
-		"gpt-5-low":           "claude-3-7-sonnet-20250219",
-		"gpt-5-minimal":       "claude-3-5-haiku-20241022",
-		"gpt-5":               "claude-opus-4-1-20250805",
-		"gpt-5-codex":         "claude-sonnet-4-5-20250929",
-		"gpt-5-codex-low":     "claude-3-5-haiku-20241022",
-		"gpt-5-codex-medium":  "claude-sonnet-4-5-20250929",
-		"gpt-5-codex-high":    "claude-opus-4-1-20250805",
+		"gpt-5-high":         "claude-opus-4-1-20250805",
+		"gpt-5-medium":       "claude-sonnet-4-5-20250929",
+		"gpt-5-low":          "claude-3-7-sonnet-20250219",
+		"gpt-5-minimal":      "claude-3-5-haiku-20241022",
+		"gpt-5":              "claude-opus-4-1-20250805",
+		"gpt-5-codex":        "claude-sonnet-4-5-20250929",
+		"gpt-5-codex-low":    "claude-3-5-haiku-20241022",
+		"gpt-5-codex-medium": "claude-sonnet-4-5-20250929",
+		"gpt-5-codex-high":   "claude-opus-4-1-20250805",
 	}
 
 	switch t {
@@ -94,4 +97,34 @@ func EnsureModelForTarget(target, model string) (string, bool) {
 	}
 }
 
+// EnsureModelForTargetWithConfig 在切换路由时, 优先使用配置中的模型映射; 否则退回静态映射
+func EnsureModelForTargetWithConfig(cfg *sdkcfg.SDKConfig, target, model string) (string, bool) {
+	if TargetHasModel(target, model) {
+		return model, false
+	}
+	t := strings.ToLower(strings.TrimSpace(target))
+	m := strings.ToLower(strings.TrimSpace(model))
 
+	// 尝试读取配置映射
+	if cfg != nil {
+		if t == con.Codex && len(cfg.ModelMapping.ClaudeToCodex) > 0 {
+			if mapped, ok := cfg.ModelMapping.ClaudeToCodex[m]; ok && strings.TrimSpace(mapped) != "" {
+				return mapped, true
+			}
+			if def := strings.TrimSpace(cfg.ModelMapping.DefaultCodex); def != "" {
+				return def, true
+			}
+		}
+		if t == con.Claude && len(cfg.ModelMapping.CodexToClaude) > 0 {
+			if mapped, ok := cfg.ModelMapping.CodexToClaude[m]; ok && strings.TrimSpace(mapped) != "" {
+				return mapped, true
+			}
+			if def := strings.TrimSpace(cfg.ModelMapping.DefaultClaude); def != "" {
+				return def, true
+			}
+		}
+	}
+
+	// 回退到静态逻辑
+	return EnsureModelForTarget(target, model)
+}

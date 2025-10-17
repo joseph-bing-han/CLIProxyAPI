@@ -10,9 +10,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/interfaces"
 	. "github.com/router-for-me/CLIProxyAPI/v6/internal/constant"
-	conversation "github.com/router-for-me/CLIProxyAPI/v6/internal/provider/gemini-web/conversation"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/interfaces"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/util"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
 	coreexecutor "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/executor"
@@ -177,14 +176,18 @@ func (h *BaseAPIHandler) ExecuteWithAuthManager(ctx context.Context, handlerType
 	// 开关下优先重写目标模型名并同步请求体
 	if h != nil && h.Cfg != nil {
 		if handlerType == Claude && h.Cfg.Claude2Codex {
-			if mapped, changed := util.EnsureModelForTarget(Codex, modelName); changed {
+			if mapped, changed := util.EnsureModelForTargetWithConfig(h.Cfg, Codex, modelName); changed {
 				modelName = mapped
-				if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil { rawJSON = b }
+				if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil {
+					rawJSON = b
+				}
 			}
 		} else if handlerType == OpenaiResponse && h.Cfg.Codex2Claude && !h.Cfg.Claude2Codex {
-			if mapped, changed := util.EnsureModelForTarget(Claude, modelName); changed {
+			if mapped, changed := util.EnsureModelForTargetWithConfig(h.Cfg, Claude, modelName); changed {
 				modelName = mapped
-				if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil { rawJSON = b }
+				if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil {
+					rawJSON = b
+				}
 			}
 		}
 	}
@@ -234,6 +237,7 @@ func (h *BaseAPIHandler) ExecuteWithAuthManager(ctx context.Context, handlerType
 // ExecuteCountWithAuthManager executes a non-streaming request via the core auth manager.
 // This path is the only supported execution route.
 func (h *BaseAPIHandler) ExecuteCountWithAuthManager(ctx context.Context, handlerType, modelName string, rawJSON []byte, alt string) ([]byte, *interfaces.ErrorMessage) {
+	// 计数接口无需强制路由，但模型名可能仍需标准化；此处沿用统一细节解析
 	providers, normalizedModel, metadata, errMsg := h.getRequestDetails(modelName)
 	if errMsg != nil {
 		return nil, errMsg
@@ -279,14 +283,18 @@ func (h *BaseAPIHandler) ExecuteStreamWithAuthManager(ctx context.Context, handl
 	// 开关下优先重写目标模型名并同步请求体
 	if h != nil && h.Cfg != nil {
 		if handlerType == Claude && h.Cfg.Claude2Codex {
-			if mapped, changed := util.EnsureModelForTarget(Codex, modelName); changed {
+			if mapped, changed := util.EnsureModelForTargetWithConfig(h.Cfg, Codex, modelName); changed {
 				modelName = mapped
-				if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil { rawJSON = b }
+				if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil {
+					rawJSON = b
+				}
 			}
 		} else if handlerType == OpenaiResponse && h.Cfg.Codex2Claude && !h.Cfg.Claude2Codex {
-			if mapped, changed := util.EnsureModelForTarget(Claude, modelName); changed {
+			if mapped, changed := util.EnsureModelForTargetWithConfig(h.Cfg, Claude, modelName); changed {
 				modelName = mapped
-				if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil { rawJSON = b }
+				if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil {
+					rawJSON = b
+				}
 			}
 		}
 	}

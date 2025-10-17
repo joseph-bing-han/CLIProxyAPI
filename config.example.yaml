@@ -56,6 +56,27 @@ claude2codex: false
 # Route all Codex (OpenAI Responses) API calls to Claude when true (default: false)
 codex2claude: false
 
+# Model mapping for cross-provider routing (optional)
+#model-mapping:
+#  # Claude -> Codex mapping
+#  claude-to-codex:
+#    claude-opus-4-1-20250805: gpt-5-high
+#    claude-sonnet-4-5-20250929: gpt-5-medium
+#    claude-sonnet-4-20250514: gpt-5-medium
+#    claude-3-7-sonnet-20250219: gpt-5-low
+#    claude-3-5-haiku-20241022: gpt-5-minimal
+#    claude-haiku-4-5-20251001: gpt-5-minimal # newly added example
+#  # Codex -> Claude mapping
+#  codex-to-claude:
+#    gpt-5-high: claude-opus-4-1-20250805
+#    gpt-5-medium: claude-sonnet-4-5-20250929
+#    gpt-5-low: claude-3-7-sonnet-20250219
+#    gpt-5-minimal: claude-3-5-haiku-20241022
+#    gpt-5: claude-opus-4-1-20250805
+#  # Defaults when a mapping is missing
+#  default-claude: claude-sonnet-4-5-20250929
+#  default-codex: gpt-5
+
 # Quota exceeded behavior
 quota-exceeded:
   switch-project: true # Whether to automatically switch to another project when a quota is exceeded
