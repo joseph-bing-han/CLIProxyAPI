@@ -19,6 +19,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -146,8 +147,11 @@ func (MyExecutor) ExecuteStream(ctx context.Context, a *coreauth.Auth, req clipe
 	return ch, nil
 }
 
+// CountTokens 返回请求的大致 token 计数(演示用, 简单用长度估算)
 func (MyExecutor) CountTokens(ctx context.Context, a *coreauth.Auth, req clipexec.Request, opts clipexec.Options) (clipexec.Response, error) {
-	return clipexec.Response{}, errors.New("not implemented")
+	// NOTE: 仅为示例目的, 实际实现应根据模型/编码精确计算 token
+	n := len(req.Payload)
+	return clipexec.Response{Payload: []byte(strconv.Itoa(n))}, nil
 }
 
 func (MyExecutor) Refresh(ctx context.Context, a *coreauth.Auth) (*coreauth.Auth, error) {
