@@ -18,10 +18,25 @@ type SDKConfig struct {
 	// Access holds request authentication provider configuration.
 	Access AccessConfig `yaml:"auth,omitempty" json:"auth,omitempty"`
 
-    // Claude2Codex 开关: 当为 true 时, 将 Claude API 请求路由到 Codex
-    Claude2Codex bool `yaml:"claude2codex" json:"claude2codex"`
-    // Codex2Claude 开关: 当为 true 时, 将 Codex(OpenAI Responses) API 请求路由到 Claude
-    Codex2Claude bool `yaml:"codex2claude" json:"codex2claude"`
+	// Claude2Codex 开关: 当为 true 时, 将 Claude API 请求路由到 Codex
+	Claude2Codex bool `yaml:"claude2codex" json:"claude2codex"`
+	// Codex2Claude 开关: 当为 true 时, 将 Codex(OpenAI Responses) API 请求路由到 Claude
+	Codex2Claude bool `yaml:"codex2claude" json:"codex2claude"`
+
+	// ModelMapping 模型映射配置, 用于在提供方切换时重写模型名
+	ModelMapping ModelMapping `yaml:"model-mapping" json:"model-mapping"`
+}
+
+// ModelMapping 定义跨提供方的模型名映射与默认回退
+type ModelMapping struct {
+	// ClaudeToCodex 将 Claude 模型映射为 Codex 模型
+	ClaudeToCodex map[string]string `yaml:"claude-to-codex" json:"claude-to-codex"`
+	// CodexToClaude 将 Codex 模型映射为 Claude 模型
+	CodexToClaude map[string]string `yaml:"codex-to-claude" json:"codex-to-claude"`
+	// DefaultClaude 当找不到 Codex->Claude 映射时的默认 Claude 模型
+	DefaultClaude string `yaml:"default-claude" json:"default-claude"`
+	// DefaultCodex 当找不到 Claude->Codex 映射时的默认 Codex 模型
+	DefaultCodex string `yaml:"default-codex" json:"default-codex"`
 }
 
 // AccessConfig groups request authentication providers.
