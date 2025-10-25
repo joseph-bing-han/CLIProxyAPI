@@ -738,6 +738,15 @@ func (m *Manager) MarkResult(ctx context.Context, result Result) {
 				}
 
 				statusCode := statusCodeFromResult(result.Error)
+				// 检查错误消息是否包含配额相关的关键词
+				isQuotaError := false
+				if result.Error != nil && result.Error.Message != "" {
+					lowerMsg := strings.ToLower(result.Error.Message)
+					isQuotaError = strings.Contains(lowerMsg, "quota") ||
+						strings.Contains(lowerMsg, "insufficient") ||
+						strings.Contains(lowerMsg, "not enough")
+				}
+
 				switch statusCode {
 				case 401:
 					next := now.Add(30 * time.Minute)
@@ -747,7 +756,14 @@ func (m *Manager) MarkResult(ctx context.Context, result Result) {
 				case 402, 403:
 					next := now.Add(30 * time.Minute)
 					state.NextRetryAfter = next
-					suspendReason = "payment_required"
+					// 如果 403 错误是配额问题，按照配额超限处理
+					if isQuotaError {
+						state.Quota = QuotaState{Exceeded: true, Reason: "quota", NextRecoverAt: next}
+						suspendReason = "quota"
+						setModelQuota = true
+					} else {
+						suspendReason = "payment_required"
+					}
 					shouldSuspendModel = true
 				case 404:
 					next := now.Add(12 * time.Hour)
@@ -1001,13 +1017,31 @@ func applyAuthFailureState(auth *Auth, resultErr *Error, retryAfter *time.Durati
 		}
 	}
 	statusCode := statusCodeFromResult(resultErr)
+	// 检查错误消息是否包含配额相关的关键词
+	isQuotaError := false
+	if resultErr != nil && resultErr.Message != "" {
+		lowerMsg := strings.ToLower(resultErr.Message)
+		isQuotaError = strings.Contains(lowerMsg, "quota") ||
+			strings.Contains(lowerMsg, "insufficient") ||
+			strings.Contains(lowerMsg, "not enough")
+	}
+
 	switch statusCode {
 	case 401:
 		auth.StatusMessage = "unauthorized"
 		auth.NextRetryAfter = now.Add(30 * time.Minute)
 	case 402, 403:
-		auth.StatusMessage = "payment_required"
-		auth.NextRetryAfter = now.Add(30 * time.Minute)
+		// 如果 403 错误是配额问题，按照配额超限处理
+		if isQuotaError {
+			auth.StatusMessage = "quota exhausted"
+			auth.Quota.Exceeded = true
+			auth.Quota.Reason = "quota"
+			auth.Quota.NextRecoverAt = now.Add(30 * time.Minute)
+			auth.NextRetryAfter = auth.Quota.NextRecoverAt
+		} else {
+			auth.StatusMessage = "payment_required"
+			auth.NextRetryAfter = now.Add(30 * time.Minute)
+		}
 	case 404:
 		auth.StatusMessage = "not_found"
 		auth.NextRetryAfter = now.Add(12 * time.Hour)
