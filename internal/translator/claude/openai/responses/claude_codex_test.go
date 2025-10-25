@@ -156,7 +156,7 @@ func TestConvertOpenAIResponsesRequestToClaude_WithFunctionCall(t *testing.T) {
 	// 查找 tool_use 消息
 	foundToolUse := false
 	foundToolResult := false
-	
+
 	for _, msg := range messages {
 		m := msg.(map[string]interface{})
 		if m["role"] == "assistant" {
@@ -282,4 +282,3 @@ func TestConvertOpenAIResponsesRequestToClaude_ReasoningEffort(t *testing.T) {
 		})
 	}
 }
-
