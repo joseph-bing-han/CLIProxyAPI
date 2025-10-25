@@ -9,7 +9,7 @@ import (
 func TestConvertCodexResponseToClaudeNonStream_Success(t *testing.T) {
 	ctx := context.Background()
 	originalRequest := []byte(`{"model":"claude-opus-4","messages":[{"role":"user","content":"Hello"}],"tools":[]}`)
-	
+
 	// 模拟 Codex 完整响应（response.completed 事件的 JSON 内容）
 	codexResponse := []byte(`{"type":"response.completed","response":{"id":"resp_123","model":"gpt-5","output":[{"type":"message","content":[{"type":"output_text","text":"Hello! How can I help you?"}]}],"usage":{"input_tokens":10,"output_tokens":8},"stop_reason":"end_turn"}}`)
 
@@ -35,7 +35,7 @@ func TestConvertCodexResponseToClaudeNonStream_Success(t *testing.T) {
 func TestConvertCodexResponseToClaudeNonStream_ErrorResponse(t *testing.T) {
 	ctx := context.Background()
 	originalRequest := []byte(`{"model":"claude-opus-4","messages":[{"role":"user","content":"test"}]}`)
-	
+
 	// 模拟 Codex 错误响应（普通 JSON 而非 SSE）
 	codexErrorResponse := []byte(`{"error":{"type":"insufficient_quota","message":"Insufficient credits"}}`)
 
@@ -54,7 +54,7 @@ func TestConvertCodexResponseToClaudeNonStream_ErrorResponse(t *testing.T) {
 func TestConvertCodexResponseToClaudeNonStream_ToolUse(t *testing.T) {
 	ctx := context.Background()
 	originalRequest := []byte(`{"model":"claude-opus-4","messages":[{"role":"user","content":"What's the weather?"}],"tools":[{"name":"get_weather","description":"Get weather"}]}`)
-	
+
 	// 模拟包含工具调用的 Codex 响应
 	codexResponse := []byte(`{"type":"response.completed","response":{"id":"resp_456","model":"gpt-5","output":[{"type":"function_call","call_id":"call_123","name":"get_weather","arguments":"{\"location\":\"Tokyo\"}"}],"usage":{"input_tokens":15,"output_tokens":12},"stop_reason":"tool_use"}}`)
 
@@ -79,7 +79,7 @@ func TestConvertCodexResponseToClaudeNonStream_ToolUse(t *testing.T) {
 func TestConvertCodexResponseToClaude_StreamingEvents(t *testing.T) {
 	ctx := context.Background()
 	originalRequest := []byte(`{"model":"claude-opus-4","messages":[{"role":"user","content":"test"}]}`)
-	
+
 	testCases := []struct {
 		name           string
 		codexEvent     []byte
@@ -133,11 +133,11 @@ func TestConvertCodexResponseToClaude_StreamingEvents(t *testing.T) {
 func TestConvertCodexResponseToClaude_ThinkingContent(t *testing.T) {
 	ctx := context.Background()
 	originalRequest := []byte(`{"model":"claude-opus-4","messages":[{"role":"user","content":"test"}]}`)
-	
+
 	testCases := []struct {
-		name          string
-		codexEvent    []byte
-		expectedType  string
+		name         string
+		codexEvent   []byte
+		expectedType string
 	}{
 		{
 			name:         "thinking 开始",
@@ -176,9 +176,9 @@ func TestConvertCodexResponseToClaude_ThinkingContent(t *testing.T) {
 // TestBuildReverseMapFromClaudeOriginalShortToOriginal 测试工具名称映射构建
 func TestBuildReverseMapFromClaudeOriginalShortToOriginal(t *testing.T) {
 	originalRequest := []byte(`{"tools":[{"name":"get_current_weather","description":"Get weather"},{"name":"search_web","description":"Search"}]}`)
-	
+
 	reverseMap := buildReverseMapFromClaudeOriginalShortToOriginal(originalRequest)
-	
+
 	// 验证映射不为空（如果工具名称被缩短了）
 	t.Logf("反向映射结果: %+v", reverseMap)
 }
@@ -186,9 +186,9 @@ func TestBuildReverseMapFromClaudeOriginalShortToOriginal(t *testing.T) {
 // TestClaudeTokenCount 测试 token 计数格式化
 func TestClaudeTokenCount(t *testing.T) {
 	ctx := context.Background()
-	
+
 	result := ClaudeTokenCount(ctx, 42)
-	
+
 	expected := `{"input_tokens":42}`
 	if result != expected {
 		t.Errorf("期望 %s，但得到 %s", expected, result)
@@ -197,7 +197,7 @@ func TestClaudeTokenCount(t *testing.T) {
 
 // 辅助函数：检查字符串是否包含子串
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && 
+	return len(s) >= len(substr) &&
 		(s == substr || len(s) > len(substr) && hasSubstring(s, substr))
 }
 
@@ -209,4 +209,3 @@ func hasSubstring(s, substr string) bool {
 	}
 	return false
 }
-
