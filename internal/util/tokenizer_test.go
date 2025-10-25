@@ -73,11 +73,11 @@ func TestEstimateTokensForModel(t *testing.T) {
 
 			// 验证结果在合理范围内
 			if result < tc.expectMinMax[0] || result > tc.expectMinMax[1] {
-				t.Logf("警告: Token 计数 %d 超出期望范围 [%d, %d]，但这可能是正常的", 
+				t.Logf("警告: Token 计数 %d 超出期望范围 [%d, %d]，但这可能是正常的",
 					result, tc.expectMinMax[0], tc.expectMinMax[1])
 			}
 
-			t.Logf("模型 %s 的 payload（%d bytes）估算为 %d tokens", 
+			t.Logf("模型 %s 的 payload（%d bytes）估算为 %d tokens",
 				tc.model, len(tc.payload), result)
 		})
 	}
@@ -183,7 +183,7 @@ func TestEstimateTokensForModel_Consistency(t *testing.T) {
 
 	// 多次调用应该返回相同结果
 	firstResult := EstimateTokensForModel(model, payload)
-	
+
 	for i := 0; i < 10; i++ {
 		result := EstimateTokensForModel(model, payload)
 		if result != firstResult {
@@ -197,7 +197,7 @@ func TestEstimateTokensForModel_Consistency(t *testing.T) {
 // BenchmarkEstimateTokensForModel 性能基准测试
 func BenchmarkEstimateTokensForModel(b *testing.B) {
 	payload := []byte(`{"messages":[{"role":"user","content":"This is a test message for benchmarking token estimation performance"}]}`)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		EstimateTokensForModel("gpt-5", payload)
@@ -209,10 +209,9 @@ func BenchmarkEstimateTokensForModel_Large(b *testing.B) {
 	// 创建一个大的 payload (约 100KB)
 	largeContent := string(make([]byte, 100000))
 	payload := []byte(`{"messages":[{"role":"user","content":"` + largeContent + `"}]}`)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		EstimateTokensForModel("gpt-5", payload)
 	}
 }
-
