@@ -214,7 +214,47 @@ func ConvertClaudeRequestToCodex(modelName string, inputRawJSON []byte, _ bool) 
 
 	// Add additional configuration parameters for the Codex API.
 	template, _ = sjson.Set(template, "parallel_tool_calls", true)
-	template, _ = sjson.Set(template, "reasoning.effort", "low")
+
+	// 将 Claude 的 thinking 参数转换为 Codex 的 reasoning.effort
+	// 默认值为 "low"
+	reasoningEffort := "low"
+	thinkingResult := rootResult.Get("thinking")
+	if thinkingResult.Exists() {
+		thinkingType := thinkingResult.Get("type").String()
+		if thinkingType == "disabled" {
+			// 如果明确禁用思考，设置为 none
+			reasoningEffort = "none"
+		} else if thinkingType == "enabled" || thinkingType == "" {
+			// 根据 budget_tokens 设置对应的 effort 级别
+			budgetTokens := thinkingResult.Get("budget_tokens").Int()
+			switch budgetTokens {
+			case 1024:
+				reasoningEffort = "minimal"
+			case 4096:
+				reasoningEffort = "low"
+			case 8192:
+				reasoningEffort = "medium"
+			case 24576:
+				reasoningEffort = "high"
+			default:
+				// 如果没有指定 budget_tokens 或值不匹配，使用默认值 low
+				if budgetTokens > 0 {
+					// 如果有其他值，根据大小选择最接近的级别
+					if budgetTokens < 1024 {
+						reasoningEffort = "minimal"
+					} else if budgetTokens < 4096 {
+						reasoningEffort = "low"
+					} else if budgetTokens < 8192 {
+						reasoningEffort = "medium"
+					} else {
+						reasoningEffort = "high"
+					}
+				}
+			}
+		}
+	}
+
+	template, _ = sjson.Set(template, "reasoning.effort", reasoningEffort)
 	template, _ = sjson.Set(template, "reasoning.summary", "auto")
 	template, _ = sjson.Set(template, "stream", true)
 	template, _ = sjson.Set(template, "store", false)

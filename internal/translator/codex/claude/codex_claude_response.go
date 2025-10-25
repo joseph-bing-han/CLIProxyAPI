@@ -162,6 +162,11 @@ func ConvertCodexResponseToClaude(_ context.Context, _ string, originalRequestRa
 		output += fmt.Sprintf("data: %s\n\n", template)
 	}
 
+	// 如果 output 为空，返回空切片而不是包含空字符串的切片
+	// 这样可以避免发送空的 SSE 事件导致客户端 JSON 解析错误
+	if output == "" {
+		return []string{}
+	}
 	return []string{output}
 }
 
@@ -179,6 +184,40 @@ func ConvertCodexResponseToClaude(_ context.Context, _ string, originalRequestRa
 // Returns:
 //   - string: A Claude Code-compatible JSON response containing all message content and metadata
 func ConvertCodexResponseToClaudeNonStream(_ context.Context, _ string, originalRequestRawJSON, _ []byte, rawJSON []byte, _ *any) string {
+	// 检查是否是普通 JSON 错误响应（非 SSE 格式）
+	// 当 Codex API 返回 403/500 等错误时，可能返回普通 JSON 而不是 SSE 格式
+	trimmed := bytes.TrimSpace(rawJSON)
+	if len(trimmed) > 0 && trimmed[0] == '{' && !bytes.Contains(trimmed, []byte("data:")) {
+		// 这是普通 JSON 响应，尝试解析并转换为 Claude 错误格式
+		rootResult := gjson.ParseBytes(trimmed)
+		if errorObj := rootResult.Get("error"); errorObj.Exists() {
+			// 构造 Claude 风格的错误响应
+			errorMsg := errorObj.Get("message").String()
+			if errorMsg == "" {
+				errorMsg = string(trimmed) // 使用原始错误内容
+			}
+			errorType := errorObj.Get("type").String()
+			if errorType == "" {
+				errorType = "api_error"
+			}
+
+			claudeError := map[string]interface{}{
+				"type": "error",
+				"error": map[string]interface{}{
+					"type":    errorType,
+					"message": errorMsg,
+				},
+			}
+			responseJSON, err := json.Marshal(claudeError)
+			if err == nil {
+				return string(responseJSON)
+			}
+		}
+		// 如果不是标准错误格式，返回原始 JSON 包装为错误
+		wrapped := fmt.Sprintf(`{"type":"error","error":{"type":"api_error","message":%q}}`, string(trimmed))
+		return wrapped
+	}
+
 	revNames := buildReverseMapFromClaudeOriginalShortToOriginal(originalRequestRawJSON)
 
 	rootResult := gjson.ParseBytes(rawJSON)
