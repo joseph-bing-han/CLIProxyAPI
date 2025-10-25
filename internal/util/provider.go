@@ -8,7 +8,6 @@ import (
 
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/registry"
-	"strings"
 )
 
 // GetProviderName determines all AI service providers capable of serving a registered model.
