@@ -21,7 +21,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
-	"github.com/tiktoken-go/tokenizer"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

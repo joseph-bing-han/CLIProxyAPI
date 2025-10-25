@@ -9,11 +9,7 @@ import (
 
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/registry"
-<<<<<<< HEAD
 	log "github.com/sirupsen/logrus"
-=======
-	"strings"
->>>>>>> 5d1035a (实现Cluade/Codex相互转换)
 )
 
 // GetProviderName determines all AI service providers capable of serving a registered model.
