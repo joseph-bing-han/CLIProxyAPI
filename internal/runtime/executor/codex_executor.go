@@ -160,20 +160,16 @@ func (e *CodexExecutor) Execute(ctx context.Context, auth *cliproxyauth.Auth, re
 	if httpResp.StatusCode < 200 || httpResp.StatusCode >= 300 {
 		b, _ := io.ReadAll(httpResp.Body)
 		appendAPIResponseChunk(ctx, e.cfg, b)
-<<<<<<< HEAD
-		log.Debugf("request error, error status: %d, error body: %s", httpResp.StatusCode, summarizeErrorBody(httpResp.Header.Get("Content-Type"), b))
-		err = statusErr{code: httpResp.StatusCode, msg: string(b)}
-		return resp, err
-=======
-		// 将上游错误体转换为 Claude 非流式错误 JSON, 并以 200 返回
-		// 统一格式: {"type":"error","message":<text>}
+		// 将上游错误作为Go error返回，携带HTTP状态码，由 handler 统一写出
 		msg := string(bytes.TrimSpace(b))
 		if msg == "" {
-			msg = fmt.Sprintf("upstream %d", httpResp.StatusCode)
+			msg = fmt.Sprintf("upstream error: HTTP %d", httpResp.StatusCode)
 		}
-		translated := sdktranslator.TranslateNonStream(ctx, to, from, req.Model, bytes.Clone(opts.OriginalRequest), body, []byte(fmt.Sprintf("{\"type\":\"error\",\"message\":%q}", msg)), nil)
-		return cliproxyexecutor.Response{Payload: []byte(translated)}, nil
->>>>>>> 5d1035a (实现Cluade/Codex相互转换)
+		statusErr := &httpStatusError{
+			statusCode: httpResp.StatusCode,
+			err:        fmt.Errorf("%s", msg),
+		}
+		return cliproxyexecutor.Response{}, statusErr
 	}
 	data, err := io.ReadAll(httpResp.Body)
 	if err != nil {
@@ -287,46 +283,19 @@ func (e *CodexExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.Au
 	}
 	recordAPIResponseMetadata(ctx, e.cfg, httpResp.StatusCode, httpResp.Header.Clone())
 	if httpResp.StatusCode < 200 || httpResp.StatusCode >= 300 {
-<<<<<<< HEAD
-		data, readErr := io.ReadAll(httpResp.Body)
-		if errClose := httpResp.Body.Close(); errClose != nil {
-			log.Errorf("codex executor: close response body error: %v", errClose)
-		}
-		if readErr != nil {
-			recordAPIResponseError(ctx, e.cfg, readErr)
-			return nil, readErr
-		}
-		appendAPIResponseChunk(ctx, e.cfg, data)
-		log.Debugf("request error, error status: %d, error body: %s", httpResp.StatusCode, summarizeErrorBody(httpResp.Header.Get("Content-Type"), data))
-		err = statusErr{code: httpResp.StatusCode, msg: string(data)}
-		return nil, err
-=======
-		// 将上游错误包裹为 SSE 错误事件返回, 保持 HTTP 200 但以事件方式告知客户端
 		b, _ := io.ReadAll(httpResp.Body)
 		_ = httpResp.Body.Close()
 		appendAPIResponseChunk(ctx, e.cfg, b)
-		out := make(chan cliproxyexecutor.StreamChunk)
-		go func() {
-			defer close(out)
-			// 若上游已是 SSE 片段, 直接转发; 否则包裹为标准 SSE error 事件
-			line := bytes.TrimSpace(b)
-			if bytes.HasPrefix(line, []byte("event:")) {
-				if len(line) > 0 {
-					out <- cliproxyexecutor.StreamChunk{Payload: append(line, '\n', '\n')}
-				}
-				return
-			}
-			payload := []byte("event: error\n")
-			payload = append(payload, []byte("data: ")...)
-			if len(line) == 0 {
-				line = []byte(fmt.Sprintf("{\"type\":\"error\",\"message\":\"upstream %d\"}", httpResp.StatusCode))
-			}
-			payload = append(payload, line...)
-			payload = append(payload, '\n', '\n')
-			out <- cliproxyexecutor.StreamChunk{Payload: payload}
-		}()
+		// 将上游错误作为 StreamChunk.Err 返回，携带正确的HTTP状态码
+		msg := string(bytes.TrimSpace(b))
+		if msg == "" {
+			msg = fmt.Sprintf("upstream error: HTTP %d", httpResp.StatusCode)
+		}
+		statusErr := &httpStatusError{statusCode: httpResp.StatusCode, err: fmt.Errorf("%s", msg)}
+		out := make(chan cliproxyexecutor.StreamChunk, 1)
+		out <- cliproxyexecutor.StreamChunk{Err: statusErr}
+		close(out)
 		return out, nil
->>>>>>> 5d1035a (实现Cluade/Codex相互转换)
 	}
 	out := make(chan cliproxyexecutor.StreamChunk)
 	stream = out
@@ -388,16 +357,8 @@ func (e *CodexExecutor) CountTokens(ctx context.Context, auth *cliproxyauth.Auth
 			count = 1
 		}
 	} else if util.InArray([]string{"gpt-5-codex-mini", "gpt-5-codex-mini-medium", "gpt-5-codex-mini-high"}, req.Model) {
-		modelForCounting = "gpt-5"
-		body, _ = sjson.SetBytes(body, "model", "codex-mini-latest")
-		switch req.Model {
-		case "gpt-5-codex-mini-medium":
-			body, _ = sjson.SetBytes(body, "reasoning.effort", "medium")
-		case "gpt-5-codex-mini-high":
-			body, _ = sjson.SetBytes(body, "reasoning.effort", "high")
-		default:
-			body, _ = sjson.SetBytes(body, "reasoning.effort", "medium")
-		}
+		// 计数分支仅用于估算，不需要调整 body 或外部变量
+		// 如需更精确，可在此分支单独映射到参考模型名
 	}
 	payload := []byte(fmt.Sprintf("{\"input_tokens\":%d}", count))
 	return cliproxyexecutor.Response{Payload: payload}, nil
@@ -526,4 +487,18 @@ func codexCreds(a *cliproxyauth.Auth) (apiKey, baseURL string) {
 		}
 	}
 	return
+}
+
+// httpStatusError 是一个携带HTTP状态码的错误类型
+type httpStatusError struct {
+	statusCode int
+	err        error
+}
+
+func (e *httpStatusError) Error() string {
+	return e.err.Error()
+}
+
+func (e *httpStatusError) StatusCode() int {
+	return e.statusCode
 }

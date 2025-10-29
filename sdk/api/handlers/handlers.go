@@ -145,12 +145,16 @@ func (h *BaseAPIHandler) ExecuteWithAuthManager(ctx context.Context, handlerType
 		if handlerType == Claude && h.Cfg.Claude2Codex {
 			if mapped, changed := util.EnsureModelForTargetWithConfig(h.Cfg, Codex, modelName); changed {
 				modelName = mapped
-				if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil { rawJSON = b }
+				if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil {
+					rawJSON = b
+				}
 			}
 		} else if handlerType == OpenaiResponse && h.Cfg.Codex2Claude && !h.Cfg.Claude2Codex {
 			if mapped, changed := util.EnsureModelForTargetWithConfig(h.Cfg, Claude, modelName); changed {
 				modelName = mapped
-				if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil { rawJSON = b }
+				if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil {
+					rawJSON = b
+				}
 			}
 		}
 	}
@@ -248,12 +252,16 @@ func (h *BaseAPIHandler) ExecuteStreamWithAuthManager(ctx context.Context, handl
 		if handlerType == Claude && h.Cfg.Claude2Codex {
 			if mapped, changed := util.EnsureModelForTargetWithConfig(h.Cfg, Codex, modelName); changed {
 				modelName = mapped
-				if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil { rawJSON = b }
+				if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil {
+					rawJSON = b
+				}
 			}
 		} else if handlerType == OpenaiResponse && h.Cfg.Codex2Claude && !h.Cfg.Claude2Codex {
 			if mapped, changed := util.EnsureModelForTargetWithConfig(h.Cfg, Claude, modelName); changed {
 				modelName = mapped
-				if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil { rawJSON = b }
+				if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil {
+					rawJSON = b
+				}
 			}
 		}
 	}
