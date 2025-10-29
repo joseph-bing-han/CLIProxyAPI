@@ -116,7 +116,7 @@ func (h *ClaudeCodeAPIHandler) ClaudeCountTokens(c *gin.Context) {
 
 	resp, errMsg := h.ExecuteCountWithAuthManager(cliCtx, h.HandlerType(), modelName, rawJSON, alt)
 	if errMsg != nil {
-		h.WriteErrorResponse(c, errMsg)
+		h.writeClaudeErrorResponse(c, errMsg)
 		cliCancel(errMsg.Error)
 		return
 	}
@@ -153,7 +153,7 @@ func (h *ClaudeCodeAPIHandler) handleNonStreamingResponse(c *gin.Context, rawJSO
 
 	resp, errMsg := h.ExecuteWithAuthManager(cliCtx, h.HandlerType(), modelName, rawJSON, alt)
 	if errMsg != nil {
-		h.WriteErrorResponse(c, errMsg)
+		h.writeClaudeErrorResponse(c, errMsg)
 		cliCancel(errMsg.Error)
 		return
 	}
@@ -312,5 +312,44 @@ func (h *ClaudeCodeAPIHandler) toClaudeError(msg *interfaces.ErrorMessage) claud
 			Type:    "api_error",
 			Message: msg.Error.Error(),
 		},
+	}
+}
+
+// writeClaudeErrorResponse writes a Claude-formatted JSON error response
+func (h *ClaudeCodeAPIHandler) writeClaudeErrorResponse(c *gin.Context, msg *interfaces.ErrorMessage) {
+	status := http.StatusInternalServerError
+	if msg != nil && msg.StatusCode > 0 {
+		status = msg.StatusCode
+	}
+
+	// Set additional headers if provided
+	if msg != nil && msg.Addon != nil {
+		for key, values := range msg.Addon {
+			if len(values) == 0 {
+				continue
+			}
+			c.Writer.Header().Del(key)
+			for _, value := range values {
+				c.Writer.Header().Add(key, value)
+			}
+		}
+	}
+
+	// Write Claude-formatted JSON error
+	errorResponse := h.toClaudeError(msg)
+	errorBytes, _ := json.Marshal(errorResponse)
+
+	// Set Content-Length to ensure proper HTTP response
+	c.Header("Content-Length", fmt.Sprintf("%d", len(errorBytes)))
+
+	// Write status code
+	c.Status(status)
+
+	// Write error body and flush immediately
+	_, _ = c.Writer.Write(errorBytes)
+
+	// Flush to ensure the client receives the response immediately
+	if flusher, ok := c.Writer.(http.Flusher); ok {
+		flusher.Flush()
 	}
 }

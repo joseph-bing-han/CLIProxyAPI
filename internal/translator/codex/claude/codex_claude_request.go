@@ -156,7 +156,31 @@ func ConvertClaudeRequestToCodex(modelName string, inputRawJSON []byte, _ bool) 
 						flushMessage()
 						functionCallOutputMessage := `{"type":"function_call_output"}`
 						functionCallOutputMessage, _ = sjson.Set(functionCallOutputMessage, "call_id", messageContentResult.Get("tool_use_id").String())
-						functionCallOutputMessage, _ = sjson.Set(functionCallOutputMessage, "output", messageContentResult.Get("content").String())
+
+						// content字段可以是字符串或数组，需要正确处理
+						contentResult := messageContentResult.Get("content")
+						var outputStr string
+						if contentResult.IsArray() {
+							// content是数组格式，需要提取文本内容
+							var textBuilder strings.Builder
+							contentResult.ForEach(func(_, item gjson.Result) bool {
+								if item.Get("type").String() == "text" {
+									if text := item.Get("text").String(); text != "" {
+										if textBuilder.Len() > 0 {
+											textBuilder.WriteString("\n")
+										}
+										textBuilder.WriteString(text)
+									}
+								}
+								return true
+							})
+							outputStr = textBuilder.String()
+						} else {
+							// content是字符串格式
+							outputStr = contentResult.String()
+						}
+
+						functionCallOutputMessage, _ = sjson.Set(functionCallOutputMessage, "output", outputStr)
 						template, _ = sjson.SetRaw(template, "input.-1", functionCallOutputMessage)
 					}
 				}

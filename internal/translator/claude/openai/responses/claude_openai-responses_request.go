@@ -261,9 +261,16 @@ func ConvertOpenAIResponsesRequestToClaude(modelName string, inputRawJSON []byte
 				// Map to user tool_result
 				callID := item.Get("call_id").String()
 				outputStr := item.Get("output").String()
-				toolResult := `{"type":"tool_result","tool_use_id":"","content":""}`
+
+				// 根据Claude API规范，content可以是字符串或数组格式
+				// 这里我们使用数组格式以保持一致性并避免客户端解析错误
+				toolResult := `{"type":"tool_result","tool_use_id":"","content":[]}`
 				toolResult, _ = sjson.Set(toolResult, "tool_use_id", callID)
-				toolResult, _ = sjson.Set(toolResult, "content", outputStr)
+
+				// 将输出包装为text内容块
+				textContent := `{"type":"text","text":""}`
+				textContent, _ = sjson.Set(textContent, "text", outputStr)
+				toolResult, _ = sjson.SetRaw(toolResult, "content.-1", textContent)
 
 				usr := `{"role":"user","content":[]}`
 				usr, _ = sjson.SetRaw(usr, "content.-1", toolResult)

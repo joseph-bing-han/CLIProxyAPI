@@ -45,6 +45,46 @@ func ConvertCodexResponseToClaude(_ context.Context, _ string, originalRequestRa
 
 	// log.Debugf("rawJSON: %s", string(rawJSON))
 	if !bytes.HasPrefix(rawJSON, dataTag) {
+		trimmed := bytes.TrimSpace(rawJSON)
+
+		// 空数据块的处理：在SSE流式传输中，空数据块是正常的（心跳、事件间隔等）
+		// 真正的HTTP错误（429/500）应该在HTTP层面通过status code处理
+		// 这里只处理有实际内容但格式错误的响应
+		if len(trimmed) == 0 {
+			// 流式传输中的空数据块，直接忽略
+			return []string{}
+		}
+
+		// 如果有响应体但不是SSE格式，尝试解析为JSON错误
+		if trimmed[0] == '{' {
+			rootResult := gjson.ParseBytes(trimmed)
+			if errorObj := rootResult.Get("error"); errorObj.Exists() {
+				// 构造Claude风格的错误响应
+				errorMsg := errorObj.Get("message").String()
+				if errorMsg == "" {
+					errorMsg = string(trimmed)
+				}
+				errorType := errorObj.Get("type").String()
+				if errorType == "" {
+					errorType = "api_error"
+				}
+				claudeError := map[string]interface{}{
+					"type": "error",
+					"error": map[string]interface{}{
+						"type":    errorType,
+						"message": errorMsg,
+					},
+				}
+				errorJSON, err := json.Marshal(claudeError)
+				if err == nil {
+					return []string{
+						"event: error\n" +
+							fmt.Sprintf("data: %s\n\n", string(errorJSON)),
+					}
+				}
+			}
+		}
+		// 其他非SSE格式响应，返回空数组（保持原有行为）
 		return []string{}
 	}
 	rawJSON = bytes.TrimSpace(rawJSON[5:])

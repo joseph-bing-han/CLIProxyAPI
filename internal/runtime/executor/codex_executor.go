@@ -105,7 +105,7 @@ func (e *CodexExecutor) Execute(ctx context.Context, auth *cliproxyauth.Auth, re
 		// 将上游错误体转换为 Claude/Codex 标准错误 JSON, 统一以 200 返回
 		msg := string(bytes.TrimSpace(b))
 		if msg == "" {
-			msg = fmt.Sprintf("upstream %d", httpResp.StatusCode)
+			msg = fmt.Sprintf("upstream error: HTTP %d", httpResp.StatusCode)
 		}
 		translated := sdktranslator.TranslateNonStream(ctx, to, from, req.Model, bytes.Clone(opts.OriginalRequest), body, []byte(fmt.Sprintf("{\"type\":\"error\",\"message\":%q}", msg)), nil)
 		return cliproxyexecutor.Response{Payload: []byte(translated)}, nil
@@ -203,26 +203,15 @@ func (e *CodexExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.Au
 		b, _ := io.ReadAll(httpResp.Body)
 		_ = httpResp.Body.Close()
 		appendAPIResponseChunk(ctx, e.cfg, b)
-		out := make(chan cliproxyexecutor.StreamChunk)
-		go func() {
-			defer close(out)
-			// 若上游已是 SSE 片段, 直接转发; 否则包裹为标准 SSE error 事件
-			line := bytes.TrimSpace(b)
-			if bytes.HasPrefix(line, []byte("event:")) {
-				if len(line) > 0 {
-					out <- cliproxyexecutor.StreamChunk{Payload: append(line, '\n', '\n')}
-				}
-				return
-			}
-			payload := []byte("event: error\n")
-			payload = append(payload, []byte("data: ")...)
-			if len(line) == 0 {
-				line = []byte(fmt.Sprintf("{\"type\":\"error\",\"message\":\"upstream %d\"}", httpResp.StatusCode))
-			}
-			payload = append(payload, line...)
-			payload = append(payload, '\n', '\n')
-			out <- cliproxyexecutor.StreamChunk{Payload: payload}
-		}()
+		// 将上游错误作为 StreamChunk.Err 返回，携带正确的HTTP状态码
+		msg := string(bytes.TrimSpace(b))
+		if msg == "" {
+			msg = fmt.Sprintf("upstream error: HTTP %d", httpResp.StatusCode)
+		}
+		statusErr := &httpStatusError{statusCode: httpResp.StatusCode, err: fmt.Errorf("%s", msg)}
+		out := make(chan cliproxyexecutor.StreamChunk, 1)
+		out <- cliproxyexecutor.StreamChunk{Err: statusErr}
+		close(out)
 		return out, nil
 	}
 	out := make(chan cliproxyexecutor.StreamChunk)
@@ -485,4 +474,18 @@ func codexCreds(a *cliproxyauth.Auth) (apiKey, baseURL string) {
 		}
 	}
 	return
+}
+
+// httpStatusError 是一个携带HTTP状态码的错误类型
+type httpStatusError struct {
+	statusCode int
+	err        error
+}
+
+func (e *httpStatusError) Error() string {
+	return e.err.Error()
+}
+
+func (e *httpStatusError) StatusCode() int {
+	return e.statusCode
 }
