@@ -203,15 +203,26 @@ func (e *CodexExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.Au
 		b, _ := io.ReadAll(httpResp.Body)
 		_ = httpResp.Body.Close()
 		appendAPIResponseChunk(ctx, e.cfg, b)
-		// 将上游错误作为 StreamChunk.Err 返回，携带正确的HTTP状态码
-		msg := string(bytes.TrimSpace(b))
-		if msg == "" {
-			msg = fmt.Sprintf("upstream error: HTTP %d", httpResp.StatusCode)
-		}
-		statusErr := &httpStatusError{statusCode: httpResp.StatusCode, err: fmt.Errorf("%s", msg)}
-		out := make(chan cliproxyexecutor.StreamChunk, 1)
-		out <- cliproxyexecutor.StreamChunk{Err: statusErr}
-		close(out)
+		out := make(chan cliproxyexecutor.StreamChunk)
+		go func() {
+			defer close(out)
+			// 若上游已是 SSE 片段, 直接转发; 否则包裹为标准 SSE error 事件
+			line := bytes.TrimSpace(b)
+			if bytes.HasPrefix(line, []byte("event:")) {
+				if len(line) > 0 {
+					out <- cliproxyexecutor.StreamChunk{Payload: append(line, '\n', '\n')}
+				}
+				return
+			}
+			payload := []byte("event: error\n")
+			payload = append(payload, []byte("data: ")...)
+			if len(line) == 0 {
+				line = []byte(fmt.Sprintf("{\"type\":\"error\",\"message\":\"upstream %d\"}", httpResp.StatusCode))
+			}
+			payload = append(payload, line...)
+			payload = append(payload, '\n', '\n')
+			out <- cliproxyexecutor.StreamChunk{Payload: payload}
+		}()
 		return out, nil
 	}
 	out := make(chan cliproxyexecutor.StreamChunk)

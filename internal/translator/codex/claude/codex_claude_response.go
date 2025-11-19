@@ -228,7 +228,7 @@ func ConvertCodexResponseToClaudeNonStream(_ context.Context, _ string, original
 	// 当 Codex API 返回 403/500 等错误时，可能返回普通 JSON 而不是 SSE 格式
 	trimmed := bytes.TrimSpace(rawJSON)
 	if len(trimmed) > 0 && trimmed[0] == '{' && !bytes.Contains(trimmed, []byte("data:")) {
-		// 这是普通 JSON 响应，尝试解析并转换为 Claude 错误格式
+		// 普通 JSON 响应：仅当包含 error 时才包装，否则继续按 response.completed 处理
 		rootResult := gjson.ParseBytes(trimmed)
 		if errorObj := rootResult.Get("error"); errorObj.Exists() {
 			// 构造 Claude 风格的错误响应
@@ -252,10 +252,11 @@ func ConvertCodexResponseToClaudeNonStream(_ context.Context, _ string, original
 			if err == nil {
 				return string(responseJSON)
 			}
+			// 如果序列化失败，退回包装错误
+			return fmt.Sprintf(`{"type":"error","error":{"type":"api_error","message":%q}}`, string(trimmed))
 		}
-		// 如果不是标准错误格式，返回原始 JSON 包装为错误
-		wrapped := fmt.Sprintf(`{"type":"error","error":{"type":"api_error","message":%q}}`, string(trimmed))
-		return wrapped
+		// 非错误 JSON，继续使用后续逻辑处理
+		rawJSON = trimmed
 	}
 
 	revNames := buildReverseMapFromClaudeOriginalShortToOriginal(originalRequestRawJSON)
