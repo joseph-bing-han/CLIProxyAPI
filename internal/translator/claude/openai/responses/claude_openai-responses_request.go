@@ -91,15 +91,17 @@ func ConvertOpenAIResponsesRequestToClaude(modelName string, inputRawJSON []byte
 	// Stream
 	out, _ = sjson.Set(out, "stream", stream)
 
-	// instructions -> as a leading message (use role user for Claude API compatibility)
+	// instructions -> 同步到 system 字段, 并作为首条消息
 	instructionsText := ""
 	extractedFromSystem := false
 	if instr := root.Get("instructions"); instr.Exists() && instr.Type == gjson.String {
 		instructionsText = instr.String()
 		if instructionsText != "" {
-			sysMsg := `{"role":"user","content":""}`
+			// 为 Claude API 写入 system，并保留一条消息方便部分客户端兼容
+			sysMsg := `{"role":"system","content":""}`
 			sysMsg, _ = sjson.Set(sysMsg, "content", instructionsText)
 			out, _ = sjson.SetRaw(out, "messages.-1", sysMsg)
+			out, _ = sjson.Set(out, "system", instructionsText)
 		}
 	}
 
@@ -120,9 +122,10 @@ func ConvertOpenAIResponsesRequestToClaude(modelName string, inputRawJSON []byte
 					}
 					instructionsText = builder.String()
 					if instructionsText != "" {
-						sysMsg := `{"role":"user","content":""}`
+						sysMsg := `{"role":"system","content":""}`
 						sysMsg, _ = sjson.Set(sysMsg, "content", instructionsText)
 						out, _ = sjson.SetRaw(out, "messages.-1", sysMsg)
+						out, _ = sjson.Set(out, "system", instructionsText)
 						extractedFromSystem = true
 					}
 				}
