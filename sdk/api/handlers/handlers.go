@@ -237,11 +237,32 @@ func (h *BaseAPIHandler) ExecuteWithAuthManager(ctx context.Context, handlerType
 // ExecuteCountWithAuthManager executes a non-streaming request via the core auth manager.
 // This path is the only supported execution route.
 func (h *BaseAPIHandler) ExecuteCountWithAuthManager(ctx context.Context, handlerType, modelName string, rawJSON []byte, alt string) ([]byte, *interfaces.ErrorMessage) {
-	// 计数接口无需强制路由，但模型名可能仍需标准化；此处沿用统一细节解析
+	// 开关下优先重写目标模型名并同步请求体
+	if h != nil && h.Cfg != nil {
+		if handlerType == Claude && h.Cfg.Claude2Codex {
+			if mapped, changed := util.EnsureModelForTargetWithConfig(h.Cfg, Codex, modelName); changed {
+				modelName = mapped
+				if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil {
+					rawJSON = b
+				}
+			}
+		} else if handlerType == OpenaiResponse && h.Cfg.Codex2Claude && !h.Cfg.Claude2Codex {
+			if mapped, changed := util.EnsureModelForTargetWithConfig(h.Cfg, Claude, modelName); changed {
+				modelName = mapped
+				if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil {
+					rawJSON = b
+				}
+			}
+		}
+	}
+
 	providers, normalizedModel, metadata, errMsg := h.getRequestDetails(modelName)
 	if errMsg != nil {
 		return nil, errMsg
 	}
+	// 根据开关强制覆盖 provider 路由
+	providers = h.overrideProvidersBySwitch(handlerType, providers)
+
 	req := coreexecutor.Request{
 		Model:   normalizedModel,
 		Payload: cloneBytes(rawJSON),

@@ -60,6 +60,10 @@ codex2claude: false
 #model-mapping:
 #  # Claude -> Codex mapping
 #  claude-to-codex:
+#    claude-opus-4-5-20251101: gpt-5.1-codex-max-xhigh
+#    claude-opus-4-5-thinking-high: gpt-5.1-codex-max-xhigh
+#    claude-opus-4-5-thinking-medium: gpt-5.1-codex-max-high
+#    claude-opus-4-5-thinking-low: gpt-5.1-codex-max-medium
 #    claude-opus-4-1-20250805: gpt-5.1-codex-max-xhigh
 #    claude-sonnet-4-5-20250929: gpt-5.1-codex-max-high
 #    claude-sonnet-4-20250514: gpt-5.1-codex-max-medium
@@ -75,7 +79,7 @@ codex2claude: false
 #    gpt-5: claude-opus-4-1-20250805
 #  # Defaults when a mapping is missing
 #  default-claude: claude-sonnet-4-5-20250929
-#  default-codex: gpt-5
+#  default-codex: gpt-5.1-codex-max
 
 # Quota exceeded behavior
 quota-exceeded:
