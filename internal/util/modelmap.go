@@ -57,12 +57,16 @@ func EnsureModelForTarget(target, model string) (string, bool) {
 
 	// Claude -> Codex (静态默认)
 	claudeToCodex := map[string]string{
-		"claude-opus-4-1-20250805":   "gpt-5.1-codex-max-xhigh",
-		"claude-sonnet-4-5-20250929": "gpt-5.1-codex-max-high",
-		"claude-sonnet-4-20250514":   "gpt-5.1-codex-max-medium",
-		"claude-3-7-sonnet-20250219": "gpt-5.1-codex-max-medium",
-		"claude-3-5-haiku-20241022":  "gpt-5.1-codex-max",
-		"claude-haiku-4-5-20251001":  "gpt-5.1-codex-max",
+		"claude-opus-4-5-20251101":        "gpt-5.1-codex-max-xhigh",
+		"claude-opus-4-5-thinking-high":   "gpt-5.1-codex-max-xhigh",
+		"claude-opus-4-5-thinking-medium": "gpt-5.1-codex-max-high",
+		"claude-opus-4-5-thinking-low":    "gpt-5.1-codex-max-medium",
+		"claude-opus-4-1-20250805":        "gpt-5.1-codex-max-xhigh",
+		"claude-sonnet-4-5-20250929":      "gpt-5.1-codex-max-high",
+		"claude-sonnet-4-20250514":        "gpt-5.1-codex-max-medium",
+		"claude-3-7-sonnet-20250219":      "gpt-5.1-codex-max-medium",
+		"claude-3-5-haiku-20241022":       "gpt-5.1-codex-max",
+		"claude-haiku-4-5-20251001":       "gpt-5.1-codex-max",
 	}
 
 	// Codex -> Claude (静态默认)
