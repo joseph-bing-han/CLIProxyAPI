@@ -102,11 +102,8 @@ func (e *CodexExecutor) Execute(ctx context.Context, auth *cliproxyauth.Auth, re
 	if httpResp.StatusCode < 200 || httpResp.StatusCode >= 300 {
 		b, _ := io.ReadAll(httpResp.Body)
 		appendAPIResponseChunk(ctx, e.cfg, b)
-		// 将上游错误体转换为 Claude/Codex 标准错误 JSON, 统一以 200 返回
-		msg := string(bytes.TrimSpace(b))
-		if msg == "" {
-			msg = fmt.Sprintf("upstream error: HTTP %d", httpResp.StatusCode)
-		}
+		// 解析上游错误消息, 支持 SSE 和 JSON 格式
+		msg := extractUpstreamErrorMessage(b, httpResp.StatusCode)
 		translated := sdktranslator.TranslateNonStream(ctx, to, from, req.Model, bytes.Clone(opts.OriginalRequest), body, []byte(fmt.Sprintf("{\"type\":\"error\",\"message\":%q}", msg)), nil)
 		return cliproxyexecutor.Response{Payload: []byte(translated)}, nil
 	}
@@ -199,27 +196,20 @@ func (e *CodexExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.Au
 	}
 	recordAPIResponseMetadata(ctx, e.cfg, httpResp.StatusCode, httpResp.Header.Clone())
 	if httpResp.StatusCode < 200 || httpResp.StatusCode >= 300 {
-		// 将上游错误包裹为 SSE 错误事件返回, 保持 HTTP 200 但以事件方式告知客户端
+		// 将上游错误包裹为 Claude 格式的 SSE 错误事件返回
 		b, _ := io.ReadAll(httpResp.Body)
 		_ = httpResp.Body.Close()
 		appendAPIResponseChunk(ctx, e.cfg, b)
 		out := make(chan cliproxyexecutor.StreamChunk)
 		go func() {
 			defer close(out)
-			// 若上游已是 SSE 片段, 直接转发; 否则包裹为标准 SSE error 事件
-			line := bytes.TrimSpace(b)
-			if bytes.HasPrefix(line, []byte("event:")) {
-				if len(line) > 0 {
-					out <- cliproxyexecutor.StreamChunk{Payload: append(line, '\n', '\n')}
-				}
-				return
-			}
+			// 解析上游错误消息, 提取实际错误内容
+			errorMsg := extractUpstreamErrorMessage(b, httpResp.StatusCode)
+			// 构造 Claude 格式的错误响应
+			claudeError := fmt.Sprintf(`{"type":"error","error":{"type":"api_error","message":%q}}`, errorMsg)
 			payload := []byte("event: error\n")
 			payload = append(payload, []byte("data: ")...)
-			if len(line) == 0 {
-				line = []byte(fmt.Sprintf("{\"type\":\"error\",\"message\":\"upstream %d\"}", httpResp.StatusCode))
-			}
-			payload = append(payload, line...)
+			payload = append(payload, []byte(claudeError)...)
 			payload = append(payload, '\n', '\n')
 			out <- cliproxyexecutor.StreamChunk{Payload: payload}
 		}()
@@ -499,4 +489,69 @@ func (e *httpStatusError) Error() string {
 
 func (e *httpStatusError) StatusCode() int {
 	return e.statusCode
+}
+
+// extractUpstreamErrorMessage 从上游响应体中提取错误消息
+// 支持解析 SSE 格式 (event: error\ndata: {...}) 和普通 JSON 格式
+func extractUpstreamErrorMessage(body []byte, statusCode int) string {
+	if len(body) == 0 {
+		return fmt.Sprintf("upstream error: HTTP %d", statusCode)
+	}
+
+	trimmed := bytes.TrimSpace(body)
+	if len(trimmed) == 0 {
+		return fmt.Sprintf("upstream error: HTTP %d", statusCode)
+	}
+
+	// 尝试解析 SSE 格式: event: error\ndata: {...}
+	if bytes.HasPrefix(trimmed, []byte("event:")) {
+		lines := bytes.Split(trimmed, []byte("\n"))
+		for _, line := range lines {
+			line = bytes.TrimSpace(line)
+			if bytes.HasPrefix(line, []byte("data:")) {
+				data := bytes.TrimSpace(line[5:])
+				if msg := parseJSONErrorMessage(data); msg != "" {
+					return msg
+				}
+			}
+		}
+	}
+
+	// 尝试解析普通 JSON 格式
+	if trimmed[0] == '{' {
+		if msg := parseJSONErrorMessage(trimmed); msg != "" {
+			return msg
+		}
+	}
+
+	// 回退: 使用原始响应内容
+	msg := string(trimmed)
+	if msg == "" {
+		msg = fmt.Sprintf("upstream error: HTTP %d", statusCode)
+	}
+	return msg
+}
+
+// parseJSONErrorMessage 从 JSON 数据中提取错误消息
+func parseJSONErrorMessage(data []byte) string {
+	result := gjson.ParseBytes(data)
+
+	// 优先检查 error.message 字段 (Claude 格式)
+	if errObj := result.Get("error"); errObj.Exists() {
+		if msg := errObj.Get("message").String(); msg != "" {
+			return msg
+		}
+	}
+
+	// 检查顶层 message 字段 (Codex SSE 格式)
+	if msg := result.Get("message").String(); msg != "" {
+		return msg
+	}
+
+	// 检查 error 字符串字段
+	if msg := result.Get("error").String(); msg != "" {
+		return msg
+	}
+
+	return ""
 }

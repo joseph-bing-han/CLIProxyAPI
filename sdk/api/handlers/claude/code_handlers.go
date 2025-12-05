@@ -174,6 +174,11 @@ func (h *ClaudeCodeAPIHandler) handleNonStreamingResponse(c *gin.Context, rawJSO
 		}
 	}
 
+	// 检测响应是否是错误格式，如果是则使用500状态码
+	if gjson.GetBytes(resp, "type").String() == "error" {
+		c.Status(http.StatusInternalServerError)
+	}
+
 	_, _ = c.Writer.Write(resp)
 	cliCancel()
 }
