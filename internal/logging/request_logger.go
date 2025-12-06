@@ -11,9 +11,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/andybalholm/brotli"
@@ -22,7 +22,6 @@ import (
 
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/buildinfo"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/interfaces"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/util"
 )
 
 // RequestLogger defines the interface for logging HTTP requests and responses.
@@ -119,6 +118,9 @@ type FileRequestLogger struct {
 
 	// logsDir is the directory where log files are stored.
 	logsDir string
+
+	// mu serializes writes to shared daily log file to avoid interleaving.
+	mu sync.Mutex
 }
 
 // NewFileRequestLogger creates a new file-based request logger.
@@ -188,7 +190,7 @@ func (l *FileRequestLogger) LogRequestWithOptions(url, method string, requestHea
 }
 
 func (l *FileRequestLogger) logRequest(url, method string, requestHeaders map[string][]string, body []byte, statusCode int, responseHeaders map[string][]string, response, apiRequest, apiResponse []byte, apiResponseErrors []*interfaces.ErrorMessage, force bool) error {
-	if !l.enabled && !force {
+	if !l.enabled {
 		return nil
 	}
 
@@ -197,10 +199,10 @@ func (l *FileRequestLogger) logRequest(url, method string, requestHeaders map[st
 		return fmt.Errorf("failed to create logs directory: %w", errEnsure)
 	}
 
-	// Generate filename
-	filename := l.generateFilename(url)
+	// Generate daily filename
+	filename := l.generateDailyFilename()
 	if force && !l.enabled {
-		filename = l.generateErrorFilename(url)
+		filename = l.generateDailyErrorFilename()
 	}
 	filePath := filepath.Join(l.logsDir, filename)
 
@@ -214,10 +216,18 @@ func (l *FileRequestLogger) logRequest(url, method string, requestHeaders map[st
 	// Create log content
 	content := l.formatLogContent(url, method, requestHeaders, body, apiRequest, apiResponse, decompressedResponse, statusCode, responseHeaders, apiResponseErrors)
 
-	// Write to file
-	if err = os.WriteFile(filePath, []byte(content), 0644); err != nil {
+	// Append to daily file (serialized)
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open log file: %w", err)
+	}
+	if _, err = file.WriteString(content); err != nil {
+		_ = file.Close()
 		return fmt.Errorf("failed to write log file: %w", err)
 	}
+	_ = file.Close()
 
 	if force && !l.enabled {
 		if errCleanup := l.cleanupOldErrorLogs(); errCleanup != nil {
@@ -249,12 +259,12 @@ func (l *FileRequestLogger) LogStreamingRequest(url, method string, headers map[
 		return nil, fmt.Errorf("failed to create logs directory: %w", err)
 	}
 
-	// Generate filename
-	filename := l.generateFilename(url)
+	// Generate daily filename
+	filename := l.generateDailyFilename()
 	filePath := filepath.Join(l.logsDir, filename)
 
-	// Create and open file
-	file, err := os.Create(filePath)
+	// Create and open file (append)
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create log file: %w", err)
 	}
@@ -281,9 +291,14 @@ func (l *FileRequestLogger) LogStreamingRequest(url, method string, headers map[
 	return writer, nil
 }
 
-// generateErrorFilename creates a filename with an error prefix to differentiate forced error logs.
-func (l *FileRequestLogger) generateErrorFilename(url string) string {
-	return fmt.Sprintf("error-%s", l.generateFilename(url))
+// generateDailyFilename returns the daily log filename.
+func (l *FileRequestLogger) generateDailyFilename() string {
+	return fmt.Sprintf("requests-%s.log", time.Now().Format("2006-01-02"))
+}
+
+// generateDailyErrorFilename returns the daily error log filename for forced logging.
+func (l *FileRequestLogger) generateDailyErrorFilename() string {
+	return fmt.Sprintf("error-requests-%s.log", time.Now().Format("2006-01-02"))
 }
 
 // ensureLogsDir creates the logs directory if it doesn't exist.
@@ -295,68 +310,6 @@ func (l *FileRequestLogger) ensureLogsDir() error {
 		return os.MkdirAll(l.logsDir, 0755)
 	}
 	return nil
-}
-
-// generateFilename creates a sanitized filename from the URL path and current timestamp.
-//
-// Parameters:
-//   - url: The request URL
-//
-// Returns:
-//   - string: A sanitized filename for the log file
-func (l *FileRequestLogger) generateFilename(url string) string {
-	// Extract path from URL
-	path := url
-	if strings.Contains(url, "?") {
-		path = strings.Split(url, "?")[0]
-	}
-
-	// Remove leading slash
-	if strings.HasPrefix(path, "/") {
-		path = path[1:]
-	}
-
-	// Sanitize path for filename
-	sanitized := l.sanitizeForFilename(path)
-
-	// Add timestamp
-	timestamp := time.Now().Format("2006-01-02T150405-.000000000")
-	timestamp = strings.Replace(timestamp, ".", "", -1)
-
-	return fmt.Sprintf("%s-%s.log", sanitized, timestamp)
-}
-
-// sanitizeForFilename replaces characters that are not safe for filenames.
-//
-// Parameters:
-//   - path: The path to sanitize
-//
-// Returns:
-//   - string: A sanitized filename
-func (l *FileRequestLogger) sanitizeForFilename(path string) string {
-	// Replace slashes with hyphens
-	sanitized := strings.ReplaceAll(path, "/", "-")
-
-	// Replace colons with hyphens
-	sanitized = strings.ReplaceAll(sanitized, ":", "-")
-
-	// Replace other problematic characters with hyphens
-	reg := regexp.MustCompile(`[<>:"|?*\s]`)
-	sanitized = reg.ReplaceAllString(sanitized, "-")
-
-	// Remove multiple consecutive hyphens
-	reg = regexp.MustCompile(`-+`)
-	sanitized = reg.ReplaceAllString(sanitized, "-")
-
-	// Remove leading/trailing hyphens
-	sanitized = strings.Trim(sanitized, "-")
-
-	// Handle empty result
-	if sanitized == "" {
-		sanitized = "root"
-	}
-
-	return sanitized
 }
 
 // cleanupOldErrorLogs keeps only the newest 10 forced error log files.
@@ -423,59 +376,19 @@ func (l *FileRequestLogger) cleanupOldErrorLogs() error {
 func (l *FileRequestLogger) formatLogContent(url, method string, headers map[string][]string, body, apiRequest, apiResponse, response []byte, status int, responseHeaders map[string][]string, apiResponseErrors []*interfaces.ErrorMessage) string {
 	var content strings.Builder
 
-	// Request info
-	content.WriteString(l.formatRequestInfo(url, method, headers, body))
-
-	if len(apiRequest) > 0 {
-		if bytes.HasPrefix(apiRequest, []byte("=== API REQUEST")) {
-			content.Write(apiRequest)
-			if !bytes.HasSuffix(apiRequest, []byte("\n")) {
-				content.WriteString("\n")
-			}
-		} else {
-			content.WriteString("=== API REQUEST ===\n")
-			content.Write(apiRequest)
-			content.WriteString("\n")
-		}
-		content.WriteString("\n")
+	timestamp := time.Now().Format(time.RFC3339Nano)
+	level := "INFO"
+	if status >= 400 {
+		level = "ERROR"
 	}
 
-	for i := 0; i < len(apiResponseErrors); i++ {
-		content.WriteString("=== API ERROR RESPONSE ===\n")
-		content.WriteString(fmt.Sprintf("HTTP Status: %d\n", apiResponseErrors[i].StatusCode))
-		content.WriteString(apiResponseErrors[i].Error.Error())
-		content.WriteString("\n\n")
-	}
-
-	if len(apiResponse) > 0 {
-		if bytes.HasPrefix(apiResponse, []byte("=== API RESPONSE")) {
-			content.Write(apiResponse)
-			if !bytes.HasSuffix(apiResponse, []byte("\n")) {
-				content.WriteString("\n")
-			}
-		} else {
-			content.WriteString("=== API RESPONSE ===\n")
-			content.Write(apiResponse)
-			content.WriteString("\n")
-		}
-		content.WriteString("\n")
-	}
-
-	// Response section
-	content.WriteString("=== RESPONSE ===\n")
-	content.WriteString(fmt.Sprintf("Status: %d\n", status))
-
-	if responseHeaders != nil {
-		for key, values := range responseHeaders {
-			for _, value := range values {
-				content.WriteString(fmt.Sprintf("%s: %s\n", key, value))
-			}
-		}
-	}
-
-	content.WriteString("\n")
+	content.WriteString(fmt.Sprintf("[%s][%s]:   %s\n\n", timestamp, level, url))
+	content.WriteString("Request: ")
+	content.Write(body)
+	content.WriteString("\n\n")
+	content.WriteString(fmt.Sprintf("Response[%d]: ", status))
 	content.Write(response)
-	content.WriteString("\n")
+	content.WriteString("\n\n\n")
 
 	return content.String()
 }
@@ -621,7 +534,7 @@ func (l *FileRequestLogger) decompressZstd(data []byte) ([]byte, error) {
 //
 // Returns:
 //   - string: The formatted request information
-func (l *FileRequestLogger) formatRequestInfo(url, method string, headers map[string][]string, body []byte) string {
+func (l *FileRequestLogger) formatRequestInfo(url, method string, _ map[string][]string, body []byte) string {
 	var content strings.Builder
 
 	content.WriteString("=== REQUEST INFO ===\n")
@@ -629,15 +542,6 @@ func (l *FileRequestLogger) formatRequestInfo(url, method string, headers map[st
 	content.WriteString(fmt.Sprintf("URL: %s\n", url))
 	content.WriteString(fmt.Sprintf("Method: %s\n", method))
 	content.WriteString(fmt.Sprintf("Timestamp: %s\n", time.Now().Format(time.RFC3339Nano)))
-	content.WriteString("\n")
-
-	content.WriteString("=== HEADERS ===\n")
-	for key, values := range headers {
-		for _, value := range values {
-			masked := util.MaskSensitiveHeaderValue(key, value)
-			content.WriteString(fmt.Sprintf("%s: %s\n", key, masked))
-		}
-	}
 	content.WriteString("\n")
 
 	content.WriteString("=== REQUEST BODY ===\n")
