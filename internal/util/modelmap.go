@@ -64,22 +64,9 @@ func EnsureModelForTarget(target, model string) (string, bool) {
 		"claude-opus-4-1-20250805":        "gpt-5.1-codex-max-xhigh",
 		"claude-sonnet-4-5-20250929":      "gpt-5.1-codex-max-high",
 		"claude-sonnet-4-20250514":        "gpt-5.1-codex-max-medium",
-		"claude-3-7-sonnet-20250219":      "gpt-5.1-codex-max-medium",
-		"claude-3-5-haiku-20241022":       "gpt-5.1-codex-max",
-		"claude-haiku-4-5-20251001":       "gpt-5.1-codex-max",
-	}
-
-	// Codex -> Claude (静态默认)
-	codexToClaude := map[string]string{
-		"gpt-5-high":         "claude-opus-4-1-20250805",
-		"gpt-5-medium":       "claude-sonnet-4-5-20250929",
-		"gpt-5-low":          "claude-3-7-sonnet-20250219",
-		"gpt-5-minimal":      "claude-3-5-haiku-20241022",
-		"gpt-5":              "claude-opus-4-1-20250805",
-		"gpt-5-codex":        "claude-sonnet-4-5-20250929",
-		"gpt-5-codex-low":    "claude-3-5-haiku-20241022",
-		"gpt-5-codex-medium": "claude-sonnet-4-5-20250929",
-		"gpt-5-codex-high":   "claude-opus-4-1-20250805",
+		"claude-3-7-sonnet-20250219":      "gpt-5.1-codex-medium",
+		"claude-3-5-haiku-20241022":       "gpt-5.1-codex",
+		"claude-haiku-4-5-20251001":       "gpt-5.1-codex",
 	}
 
 	switch t {
@@ -88,13 +75,7 @@ func EnsureModelForTarget(target, model string) (string, bool) {
 			return mapped, true
 		}
 		// 未知 Claude -> Codex 回退
-		return "gpt-5", true
-	case con.Claude:
-		if mapped, ok := codexToClaude[m]; ok {
-			return mapped, true
-		}
-		// 未知 Codex -> Claude 回退
-		return "claude-sonnet-4-5-20250929", true
+		return "gpt-5.1-codex", true
 	default:
 		return model, false
 	}
@@ -115,14 +96,6 @@ func EnsureModelForTargetWithConfig(cfg *sdkcfg.SDKConfig, target, model string)
 				return mapped, true
 			}
 			if def := strings.TrimSpace(cfg.ModelMapping.DefaultCodex); def != "" {
-				return def, true
-			}
-		}
-		if t == con.Claude && len(cfg.ModelMapping.CodexToClaude) > 0 {
-			if mapped, ok := cfg.ModelMapping.CodexToClaude[m]; ok && strings.TrimSpace(mapped) != "" {
-				return mapped, true
-			}
-			if def := strings.TrimSpace(cfg.ModelMapping.DefaultClaude); def != "" {
 				return def, true
 			}
 		}

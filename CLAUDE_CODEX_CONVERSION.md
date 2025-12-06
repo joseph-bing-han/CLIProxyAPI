@@ -115,19 +115,13 @@ var claudeToCodex = map[string]string{
     // ...
 }
 
-var codexToClaude = map[string]string{
-    "gpt-5":         "claude-3-5-sonnet-20241022",
-    "gpt-5-minimal": "claude-3-5-haiku-20241022",     // 新增
-    // ...
-}
+// codex-to-claude 功能已移除
 ```
 
 #### 动态配置映射 (`sdk/config/config.go`)
 ```go
 type ModelMapping struct {
     ClaudeToCodex map[string]string `yaml:"claude-to-codex,omitempty"`
-    CodexToClaude map[string]string `yaml:"codex-to-claude,omitempty"`
-    DefaultClaude string            `yaml:"default-claude,omitempty"`
     DefaultCodex  string            `yaml:"default-codex,omitempty"`
 }
 ```
@@ -393,9 +387,6 @@ model-mapping:
   claude-to-codex:
     claude-haiku-4-5-20251001: gpt-5-minimal
     claude-3-5-sonnet-latest: gpt-5
-  codex-to-claude:
-    gpt-5-minimal: claude-3-5-haiku-20241022
-  default-claude: claude-3-5-sonnet-20241022
   default-codex: gpt-5
 ```
 
@@ -509,7 +500,6 @@ go mod tidy
 ```yaml
 # Claude/Codex 双向转换配置
 claude2codex: true              # 将 Claude 请求路由到 Codex
-codex2claude: false             # 将 Codex 请求路由到 Claude (与上互斥)
 
 # 模型映射配置（可选，覆盖默认映射）
 model-mapping:
@@ -520,14 +510,7 @@ model-mapping:
     claude-3-5-sonnet-20240620: gpt-5-low
     claude-opus-4-1-20250805: gpt-5-codex
   
-  # Codex 模型 → Claude 模型
-  codex-to-claude:
-    gpt-5-minimal: claude-3-5-haiku-20241022
-    gpt-5: claude-3-5-sonnet-20241022
-    gpt-5-codex: claude-opus-4-20250514
-  
   # 回退默认值
-  default-claude: claude-3-5-sonnet-20241022
   default-codex: gpt-5
 
 # Codex 认证配置
@@ -541,17 +524,14 @@ codex_api_keys:
 | 配置项 | 类型 | 说明 |
 |-------|------|------|
 | `claude2codex` | bool | 将 Claude API 请求路由到 Codex 后端 |
-| `codex2claude` | bool | 将 Codex API 请求路由到 Claude 后端 |
 | `model-mapping.claude-to-codex` | map | Claude 模型到 Codex 模型的映射表 |
-| `model-mapping.codex-to-claude` | map | Codex 模型到 Claude 模型的映射表 |
-| `model-mapping.default-claude` | string | 无匹配时使用的默认 Claude 模型 |
 | `model-mapping.default-codex` | string | 无匹配时使用的默认 Codex 模型 |
 
 ### 配置优先级
 
 1. **配置文件映射** (`model-mapping` 节)
 2. **静态映射表** (`internal/util/modelmap.go`)
-3. **默认值** (`default-claude` / `default-codex`)
+3. **默认值** (`default-codex`)
 
 ---
 
@@ -768,7 +748,7 @@ encoding, err := tiktoken.GetEncoding("cl100k_base")  // GPT-4/GPT-3.5
   claude-haiku-4-5-20251001: gpt-5-minimal # 轻量级 → 轻量级
   ```
 - **配置驱动**：新模型通过配置文件添加，避免修改代码
-- **提供默认值**：使用 `default-claude` / `default-codex` 作为兜底
+- **提供默认值**：使用 `default-codex` 作为兜底
 
 #### ❌ 避免做法
 - 跨性能等级映射（如 Haiku → gpt-5-codex）
@@ -885,7 +865,6 @@ model-mapping:
 ```yaml
 # 从 Codex 切换到 Claude
 claude2codex: false
-codex2claude: true
 
 # 更新 auth 配置
 claude_api_keys:
@@ -899,7 +878,6 @@ git checkout HEAD~1 config.yaml
 
 # 方案 2：禁用转换
 claude2codex: false
-codex2claude: false
 ```
 
 ---

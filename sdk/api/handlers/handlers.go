@@ -182,13 +182,6 @@ func (h *BaseAPIHandler) ExecuteWithAuthManager(ctx context.Context, handlerType
 					rawJSON = b
 				}
 			}
-		} else if handlerType == OpenaiResponse && h.Cfg.Codex2Claude && !h.Cfg.Claude2Codex {
-			if mapped, changed := util.EnsureModelForTargetWithConfig(h.Cfg, Claude, modelName); changed {
-				modelName = mapped
-				if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil {
-					rawJSON = b
-				}
-			}
 		}
 	}
 
@@ -246,13 +239,6 @@ func (h *BaseAPIHandler) ExecuteCountWithAuthManager(ctx context.Context, handle
 					rawJSON = b
 				}
 			}
-		} else if handlerType == OpenaiResponse && h.Cfg.Codex2Claude && !h.Cfg.Claude2Codex {
-			if mapped, changed := util.EnsureModelForTargetWithConfig(h.Cfg, Claude, modelName); changed {
-				modelName = mapped
-				if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil {
-					rawJSON = b
-				}
-			}
 		}
 	}
 
@@ -305,13 +291,6 @@ func (h *BaseAPIHandler) ExecuteStreamWithAuthManager(ctx context.Context, handl
 	if h != nil && h.Cfg != nil {
 		if handlerType == Claude && h.Cfg.Claude2Codex {
 			if mapped, changed := util.EnsureModelForTargetWithConfig(h.Cfg, Codex, modelName); changed {
-				modelName = mapped
-				if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil {
-					rawJSON = b
-				}
-			}
-		} else if handlerType == OpenaiResponse && h.Cfg.Codex2Claude && !h.Cfg.Claude2Codex {
-			if mapped, changed := util.EnsureModelForTargetWithConfig(h.Cfg, Claude, modelName); changed {
 				modelName = mapped
 				if b, err := sjson.SetBytes(rawJSON, "model", modelName); err == nil {
 					rawJSON = b
@@ -493,12 +472,8 @@ func (h *BaseAPIHandler) overrideProvidersBySwitch(handlerType string, providers
 	if h == nil || h.Cfg == nil {
 		return providers
 	}
-	// 同时开启时, 仅 Claude2Codex 生效
 	if h.Cfg.Claude2Codex && handlerType == Claude {
 		return []string{Codex}
-	}
-	if h.Cfg.Codex2Claude && !h.Cfg.Claude2Codex && handlerType == OpenaiResponse {
-		return []string{Claude}
 	}
 	return providers
 }
