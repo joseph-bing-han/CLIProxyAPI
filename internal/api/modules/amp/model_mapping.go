@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/util"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/registry"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -58,8 +58,8 @@ func (m *DefaultModelMapper) MapModel(requestedModel string) string {
 		return ""
 	}
 
-	// Verify target model has available providers
-	providers := util.GetProviderName(targetModel)
+	// Verify target model has available providers (registry-backed only; no heuristic fallback)
+	providers := registry.GetGlobalRegistry().GetModelProviders(targetModel)
 	if len(providers) == 0 {
 		log.Debugf("amp model mapping: target model %s has no available providers, skipping mapping", targetModel)
 		return ""

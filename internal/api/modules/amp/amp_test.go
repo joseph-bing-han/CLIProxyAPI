@@ -157,7 +157,7 @@ func TestAmpModule_OnConfigUpdated_CacheInvalidation(t *testing.T) {
 	}
 
 	// Update config - should invalidate cache
-	if err := m.OnConfigUpdated(&config.Config{AmpCode: config.AmpCode{UpstreamURL: "http://x"}}); err != nil {
+	if err := m.OnConfigUpdated(&config.Config{AmpCode: config.AmpCode{UpstreamURL: "http://x", UpstreamAPIKey: "test-key"}}); err != nil {
 		t.Fatal(err)
 	}
 

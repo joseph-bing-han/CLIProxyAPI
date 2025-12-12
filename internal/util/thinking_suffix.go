@@ -70,6 +70,28 @@ func NormalizeThinkingModel(modelName string) (string, map[string]any) {
 		}
 	}
 
+	// 支持 GPT/Codex 模型的 "-<effort>" 形式别名，例如:
+	// - "gpt-5.2-xhigh"
+	// - "gpt-5.2-high"
+	// 仅对 "gpt-" 前缀启用，避免误伤 Claude 等模型名中的 "-thinking-high" 之类后缀。
+	if !matched {
+		lowered := strings.ToLower(strings.TrimSpace(modelName))
+		if strings.HasPrefix(lowered, "gpt-") {
+			if dash := strings.LastIndex(modelName, "-"); dash != -1 && dash < len(modelName)-1 {
+				suffix := strings.ToLower(strings.TrimSpace(modelName[dash+1:]))
+				switch suffix {
+				case "none", "low", "medium", "high", "xhigh":
+					candidateBase := strings.TrimSpace(modelName[:dash])
+					if candidateBase != "" {
+						baseModel = candidateBase
+						reasoningEffort = &suffix
+						matched = true
+					}
+				}
+			}
+		}
+	}
+
 	if !matched {
 		return baseModel, nil
 	}
