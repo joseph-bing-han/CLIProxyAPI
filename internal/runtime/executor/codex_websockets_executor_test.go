@@ -487,6 +487,32 @@ func TestApplyCodexWebsocketHeadersPreservesExplicitAPIKeyUserAgent(t *testing.T
 	}
 }
 
+func TestApplyCodexWebsocketHeadersCodexKeyUserAgentOverridesAPIKeyClientHeader(t *testing.T) {
+	cfg := &config.Config{
+		CodexKey: []config.CodexKey{{
+			APIKey:  "sk-test",
+			BaseURL: "https://hotaruapi.com/v1",
+			Headers: map[string]string{
+				"User-Agent": "codex-tui/0.140.0 (Mac OS 26.5.1; arm64) iTerm2/3.6.11 (codex-tui; 0.140.0)",
+			},
+		}},
+	}
+	auth := &cliproxyauth.Auth{Provider: "codex", Attributes: map[string]string{
+		"api_key":  "sk-test",
+		"base_url": "https://hotaruapi.com/v1",
+	}}
+	ctx := contextWithGinHeaders(map[string]string{"User-Agent": "codex_cli_rs/0.125.0 (Mac OS 25.5.0; arm64)"})
+
+	headers := applyCodexWebsocketHeaders(ctx, http.Header{}, auth, "sk-test", cfg)
+
+	if got := headers.Get("User-Agent"); got != "codex-tui/0.140.0 (Mac OS 26.5.1; arm64) iTerm2/3.6.11 (codex-tui; 0.140.0)" {
+		t.Fatalf("User-Agent = %s", got)
+	}
+	if got := headers.Get("Originator"); got != codexOriginator {
+		t.Fatalf("Originator = %s, want %s", got, codexOriginator)
+	}
+}
+
 func TestApplyCodexWebsocketHeadersUsesCanonicalAccountHeader(t *testing.T) {
 	auth := &cliproxyauth.Auth{Provider: "codex", Metadata: map[string]any{"account_id": "acct-1"}}
 
@@ -792,6 +818,38 @@ func TestApplyCodexHeadersUsesConfigUserAgentForOAuth(t *testing.T) {
 	}
 	if got := req.Header.Get("x-codex-beta-features"); got != "" {
 		t.Fatalf("x-codex-beta-features = %q, want empty", got)
+	}
+}
+
+func TestApplyCodexHeadersCodexKeyUserAgentOverridesAPIKeyClientHeader(t *testing.T) {
+	req, err := http.NewRequest(http.MethodPost, "https://hotaruapi.com/v1/responses", nil)
+	if err != nil {
+		t.Fatalf("NewRequest() error = %v", err)
+	}
+	cfg := &config.Config{
+		CodexKey: []config.CodexKey{{
+			APIKey:  "sk-test",
+			BaseURL: "https://hotaruapi.com/v1",
+			Headers: map[string]string{
+				"User-Agent": "codex-tui/0.140.0 (Mac OS 26.5.1; arm64) iTerm2/3.6.11 (codex-tui; 0.140.0)",
+			},
+		}},
+	}
+	auth := &cliproxyauth.Auth{Provider: "codex", Attributes: map[string]string{
+		"api_key":  "sk-test",
+		"base_url": "https://hotaruapi.com/v1",
+	}}
+	req = req.WithContext(contextWithGinHeaders(map[string]string{
+		"User-Agent": "codex_cli_rs/0.125.0 (Mac OS 25.5.0; arm64)",
+	}))
+
+	applyCodexHeaders(req, auth, "sk-test", true, cfg)
+
+	if got := req.Header.Get("User-Agent"); got != "codex-tui/0.140.0 (Mac OS 26.5.1; arm64) iTerm2/3.6.11 (codex-tui; 0.140.0)" {
+		t.Fatalf("User-Agent = %s", got)
+	}
+	if got := req.Header.Get("Originator"); got != codexOriginator {
+		t.Fatalf("Originator = %s, want %s", got, codexOriginator)
 	}
 }
 

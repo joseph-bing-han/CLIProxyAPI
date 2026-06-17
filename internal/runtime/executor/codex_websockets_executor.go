@@ -913,7 +913,7 @@ func applyCodexWebsocketHeaders(ctx context.Context, headers http.Header, auth *
 	misc.EnsureHeader(headers, ginHeaders, "x-responsesapi-include-timing-metrics", "")
 	misc.EnsureHeader(headers, ginHeaders, "Version", "")
 	if isAPIKey {
-		ensureHeaderWithPriority(headers, ginHeaders, "User-Agent", "", "")
+		ensureHeaderWithConfigPrecedence(headers, ginHeaders, "User-Agent", cfgUserAgent, "")
 	} else {
 		ensureHeaderWithConfigPrecedence(headers, ginHeaders, "User-Agent", cfgUserAgent, codexUserAgent)
 	}
@@ -933,7 +933,7 @@ func applyCodexWebsocketHeaders(ctx context.Context, headers http.Header, auth *
 	ensureCodexWebsocketSessionHeader(headers, ginHeaders, sessionFallback)
 	if originator := strings.TrimSpace(ginHeaders.Get("Originator")); originator != "" {
 		headers.Set("Originator", originator)
-	} else if !isAPIKey {
+	} else if !isAPIKey || shouldDefaultCodexOriginator(headers.Get("User-Agent")) {
 		headers.Set("Originator", codexOriginator)
 	}
 	if !isAPIKey {
@@ -1097,12 +1097,60 @@ func codexHeaderDefaults(cfg *config.Config, auth *cliproxyauth.Auth) (string, s
 	if cfg == nil || auth == nil {
 		return "", ""
 	}
+	if entry := resolveCodexKeyConfig(cfg, auth); entry != nil {
+		if userAgent := strings.TrimSpace(entry.Headers["User-Agent"]); userAgent != "" {
+			return userAgent, ""
+		}
+	}
 	if auth.Attributes != nil {
 		if v := strings.TrimSpace(auth.Attributes["api_key"]); v != "" {
 			return "", ""
 		}
 	}
 	return strings.TrimSpace(cfg.CodexHeaderDefaults.UserAgent), strings.TrimSpace(cfg.CodexHeaderDefaults.BetaFeatures)
+}
+
+func shouldDefaultCodexOriginator(userAgent string) bool {
+	return strings.HasPrefix(strings.TrimSpace(userAgent), codexOriginator+"/")
+}
+
+func resolveCodexKeyConfig(cfg *config.Config, auth *cliproxyauth.Auth) *config.CodexKey {
+	if auth == nil || cfg == nil {
+		return nil
+	}
+	var attrKey, attrBase string
+	if auth.Attributes != nil {
+		attrKey = strings.TrimSpace(auth.Attributes["api_key"])
+		attrBase = strings.TrimSpace(auth.Attributes["base_url"])
+	}
+	for i := range cfg.CodexKey {
+		entry := &cfg.CodexKey[i]
+		cfgKey := strings.TrimSpace(entry.APIKey)
+		cfgBase := strings.TrimSpace(entry.BaseURL)
+		if attrKey != "" && attrBase != "" {
+			if strings.EqualFold(cfgKey, attrKey) && strings.EqualFold(cfgBase, attrBase) {
+				return entry
+			}
+			continue
+		}
+		if attrKey != "" && strings.EqualFold(cfgKey, attrKey) {
+			if cfgBase == "" || strings.EqualFold(cfgBase, attrBase) {
+				return entry
+			}
+		}
+		if attrKey == "" && attrBase != "" && strings.EqualFold(cfgBase, attrBase) {
+			return entry
+		}
+	}
+	if attrKey != "" {
+		for i := range cfg.CodexKey {
+			entry := &cfg.CodexKey[i]
+			if strings.EqualFold(strings.TrimSpace(entry.APIKey), attrKey) {
+				return entry
+			}
+		}
+	}
+	return nil
 }
 
 func ensureHeaderWithPriority(target http.Header, source http.Header, key, configValue, fallbackValue string) {

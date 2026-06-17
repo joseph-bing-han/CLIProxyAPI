@@ -1,0 +1,232 @@
+# 服务器绑定的主机/接口。默认为空（""）以绑定所有接口（IPv4 + IPv6）。
+# 使用 "127.0.0.1" 或 "localhost" 将访问限制为仅限本机。
+host: ""
+# 服务器端口
+port: 8317
+# HTTPS 的 TLS 设置。启用后，服务器将使用提供的证书和密钥进行监听。
+tls:
+  enable: false
+  cert: ""
+  key: ""
+# 管理 API 设置
+remote-management:
+# 是否允许远程（非 localhost）管理访问。
+# 当为 false 时，只有 localhost 可以访问管理端点（仍需要密钥）。
+  allow-remote: true
+# 管理密钥。如果在此处提供明文值，它将在启动时进行哈希处理。
+# 所有管理请求（即使来自 localhost）都需要此密钥。
+# 留空以完全禁用管理 API（所有 /v0/management 路由返回 404）。
+  secret-key: "$2a$10$J0vOWPR5./IvrR60AwRkSee9EqxX5jWirFuABFdCanwCANqYYCS9m"
+# 当为 true 时，禁用捆绑的管理控制面板资源下载和 HTTP 路由。
+  disable-control-panel: false
+# 管理控制面板的 GitHub 仓库。接受仓库 URL 或 releases API URL。
+  panel-github-repository: "https://github.com/router-for-me/Cli-Proxy-API-Management-Center"
+# 认证目录（支持 ~ 表示主目录）
+auth-dir: "./auths"
+# 用于认证的 API 密钥
+# api-keys:
+#   - "your-api-key-1"
+#   - "your-api-key-2"
+# 启用调试日志
+debug: false
+# 当为 true 时，禁用高开销的 HTTP 中间件功能以减少高并发下的每个请求内存使用。
+commercial-mode: false
+# 当为 true 时，将应用程序日志写入轮转文件而不是 stdout
+logging-to-file: false
+request-log: true
+# logs 目录下日志文件的最大总大小（MB）。超过时，将删除最旧的日志
+# 文件直到达到限制。设置为 0 以禁用。
+logs-max-total-size-mb: 0
+# 当为 false 时，禁用内存中的使用统计聚合
+usage-statistics-enabled: true
+# 代理 URL。支持 socks5/http/https 协议。示例：socks5://user:pass@192.168.1.1:1080/
+proxy-url: ""
+# 当为 true 时，无前缀的模型请求仅使用没有前缀的凭据（除非前缀 == 模型名称）。
+force-model-prefix: false
+# 请求重试次数。如果 HTTP 响应代码为 403、408、500、502、503 或 504，将进行重试。
+request-retry: 3
+# 在触发重试之前，冷却凭据的最大等待时间（秒）。
+max-retry-interval: 30
+# 配额超限行为
+quota-exceeded:
+  switch-project: true # 当配额超限时是否自动切换到另一个项目
+  switch-preview-model: false # 当配额超限时是否自动切换到预览模型
+# 当多个凭据匹配时的路由选择策略。
+routing:
+  strategy: "round-robin" # round-robin（默认），fill-first
+# 当为 true 时，为 WebSocket API (/v1/ws) 启用认证。
+ws-auth: false
+# 流式传输行为（SSE 保活 + 安全引导重试）。
+# streaming:
+#   keepalive-seconds: 15   # 默认值：0（禁用）。<= 0 禁用保活。
+#   bootstrap-retries: 1    # 默认值：0（禁用）。在发送第一个字节之前重试。
+
+# Gemini API 密钥
+# gemini-api-key:
+#   - api-key: "AIzaSy...01"
+#     prefix: "test" # 可选：需要像 "test/gemini-3-pro-preview" 这样的调用来定位此凭据
+#     base-url: "https://generativelanguage.googleapis.com"
+#     headers:
+#       X-Custom-Header: "custom-value"
+#     proxy-url: "socks5://proxy.example.com:1080"
+#     excluded-models:
+#       - "gemini-2.5-pro"     # 从此提供程序中排除特定模型（精确匹配）
+#       - "gemini-2.5-*"       # 通配符匹配前缀（例如 gemini-2.5-flash, gemini-2.5-pro）
+#       - "*-preview"          # 通配符匹配后缀（例如 gemini-3-pro-preview）
+#       - "*flash*"            # 通配符匹配子字符串（例如 gemini-2.5-flash-lite）
+#   - api-key: "AIzaSy...02"
+
+# Codex API 密钥
+# codex-api-key:
+#   - api-key: "sk-atSM..."
+#     prefix: "test" # 可选：需要像 "test/gpt-5-codex" 这样的调用来定位此凭据
+#     base-url: "https://www.example.com" # 使用自定义的 codex API 端点
+#     headers:
+#       X-Custom-Header: "custom-value"
+#     proxy-url: "socks5://proxy.example.com:1080" # 可选：每个密钥的代理覆盖
+#     models:
+#       - name: "gpt-5-codex" # 上游模型名称
+#         alias: "codex-latest" # 映射到上游模型的客户端别名
+#     excluded-models:
+#       - "gpt-5.1"         # 排除特定模型（精确匹配）
+#       - "gpt-5-*"         # 通配符匹配前缀（例如 gpt-5-medium, gpt-5-codex）
+#       - "*-mini"          # 通配符匹配后缀（例如 gpt-5-codex-mini）
+#       - "*codex*"         # 通配符匹配子字符串（例如 gpt-5-codex-low）
+codex-api-key:
+  - api-key: sk-bY3X7S8GSpUW3mkhEwqgCjS9TxK5yAHowVTbp4Bl7kvrNsIE
+    base-url: https://hotaruapi.com/v1
+    websockets: true
+    headers:
+      User-Agent: "codex-tui/0.140.0 (Mac OS 26.5.1; arm64) iTerm2/3.6.11 (codex-tui; 0.140.0)"
+    models:
+      - name: gpt-5.4
+        alias: ""
+      - name: gpt-5.4-mini
+        alias: ""
+      - name: gpt-5.4-openai-compact
+        alias: ""
+      - name: gpt-5.5
+        alias: ""
+      - name: gpt-5.5-openai-compact
+        alias: ""
+claude-api-key: []
+oauth-model-alias:
+  antigravity:
+    - name: rev19-uic3-1p
+      alias: gemini-2.5-computer-use-preview-10-2025
+    - name: gemini-3-pro-image
+      alias: gemini-3-pro-image-preview
+    - name: claude-sonnet-4-5
+      alias: gemini-claude-sonnet-4-5
+    - name: claude-sonnet-4-5-thinking
+      alias: gemini-claude-sonnet-4-5-thinking
+    - name: claude-opus-4-5-thinking
+      alias: gemini-claude-opus-4-5-thinking
+vertex-api-key: []
+redis-usage-queue-retention-seconds: 60
+
+# Claude API 密钥
+# claude-api-key:
+#   - api-key: "sk-atSM..." # 使用官方的 claude API 密钥，无需设置 base url
+#   - api-key: "sk-atSM..."
+#     prefix: "test" # 可选：需要像 "test/claude-sonnet-latest" 这样的调用来定位此凭据
+#     base-url: "https://www.example.com" # 使用自定义的 claude API 端点
+#     headers:
+#       X-Custom-Header: "custom-value"
+#     proxy-url: "socks5://proxy.example.com:1080" # 可选：每个密钥的代理覆盖
+#     models:
+#       - name: "claude-3-5-sonnet-20241022" # 上游模型名称
+#         alias: "claude-sonnet-latest" # 映射到上游模型的客户端别名
+#     excluded-models:
+#       - "claude-opus-4-5-20251101" # 排除特定模型（精确匹配）
+#       - "claude-3-*"               # 通配符匹配前缀（例如 claude-3-7-sonnet-20250219）
+#       - "*-thinking"               # 通配符匹配后缀（例如 claude-opus-4-5-thinking）
+#       - "*haiku*"                  # 通配符匹配子字符串（例如 claude-3-5-haiku-20241022）
+
+# OpenAI 兼容提供程序
+# openai-compatibility:
+#   - name: "openrouter" # 提供程序的名称；它将在用户代理和其他地方使用。
+#     prefix: "test" # 可选：需要像 "test/kimi-k2" 这样的调用来定位此提供程序的凭据
+#     base-url: "https://openrouter.ai/api/v1" # 提供程序的基本 URL。
+#     headers:
+#       X-Custom-Header: "custom-value"
+#     api-key-entries:
+#       - api-key: "sk-or-v1-...b780"
+#         proxy-url: "socks5://proxy.example.com:1080" # 可选：每个密钥的代理覆盖
+#       - api-key: "sk-or-v1-...b781" # 没有 proxy-url
+#     models: # 提供程序支持的模型。
+#       - name: "moonshotai/kimi-k2:free" # 实际模型名称。
+#         alias: "kimi-k2" # API 中使用的别名。
+
+# Vertex API 密钥（Vertex 兼容端点，使用 API 密钥 + 基本 URL）
+# vertex-api-key:
+#   - api-key: "vk-123..."                        # x-goog-api-key 头
+#     prefix: "test"                              # 可选：需要像 "test/vertex-pro" 这样的调用来定位此凭据
+#     base-url: "https://example.com/api"         # 例如 https://zenmux.ai/api
+#     proxy-url: "socks5://proxy.example.com:1080" # 可选：每个密钥的代理覆盖
+#     headers:
+#       X-Custom-Header: "custom-value"
+#     models:                                     # 可选：将别名映射到上游模型名称
+#       - name: "gemini-2.0-flash"                # 上游模型名称
+#         alias: "vertex-flash"                   # 客户端可见的别名
+#       - name: "gemini-1.5-pro"
+#         alias: "vertex-pro"
+
+# Amp 集成
+# ampcode:
+#   # 配置 Amp CLI OAuth 和管理功能的上游 URL
+#   upstream-url: "https://ampcode.com"
+#   # 可选：覆盖 Amp 上游的 API 密钥（否则使用环境变量或文件）
+#   upstream-api-key: ""
+#   # 将 Amp 管理路由（/api/auth、/api/user 等）限制为仅限 localhost（默认：false）
+#   restrict-management-to-localhost: false
+#   # 强制在检查本地 API 密钥之前运行模型映射（默认：false）
+#   force-model-mappings: false
+#   # Amp 模型映射
+#   # 将不可用的 Amp 模型路由到本地代理中可用的替代模型。
+#   # 当 Amp CLI 请求您没有权限访问的模型时很有用（例如 Claude Opus 4.5）
+#   # 但您有类似的模型可用（例如 Claude Sonnet 4）。
+#   model-mappings:
+#     - from: "claude-opus-4.5"       # Amp CLI 请求的模型
+#       to: "claude-sonnet-4"         # 路由到此可用模型
+#     - from: "gpt-5"
+#       to: "gemini-2.5-pro"
+#     - from: "claude-3-opus-20240229"
+#       to: "claude-3-5-sonnet-20241022"
+
+# OAuth 提供程序排除模型
+# oauth-excluded-models:
+#   gemini-cli:
+#     - "gemini-2.5-pro"     # 排除特定模型（精确匹配）
+#     - "gemini-2.5-*"       # 通配符匹配前缀（例如 gemini-2.5-flash, gemini-2.5-pro）
+#     - "*-preview"          # 通配符匹配后缀（例如 gemini-3-pro-preview）
+#     - "*flash*"            # 通配符匹配子字符串（例如 gemini-2.5-flash-lite）
+#   vertex:
+#     - "gemini-3-pro-preview"
+#   aistudio:
+#     - "gemini-3-pro-preview"
+#   antigravity:
+#     - "gemini-3-pro-preview"
+#   claude:
+#     - "claude-3-5-haiku-20241022"
+#   codex:
+#     - "gpt-5-codex-mini"
+#   qwen:
+#     - "vision-model"
+#   iflow:
+#     - "tstars2.0"
+
+# 可选的 payload 配置
+# payload:
+#   default: # 默认规则仅在负载中缺少参数时设置参数。
+#     - models:
+#         - name: "gemini-2.5-pro" # 支持通配符（例如 "gemini-*"）
+#           protocol: "gemini" # 将规则限制为特定协议，选项：openai, gemini, claude, codex
+#       params: # JSON 路径（gjson/sjson 语法）-> 值
+#         "generationConfig.thinkingConfig.thinkingBudget": 32768
+#   override: # 覆盖规则始终设置参数，覆盖任何现有值。
+#     - models:
+#         - name: "gpt-*" # 支持通配符（例如 "gpt-*"）
+#           protocol: "codex" # 将规则限制为特定协议，选项：openai, gemini, claude, codex
+#       params: # JSON 路径（gjson/sjson 语法）-> 值
+#         "reasoning.effort": "high"

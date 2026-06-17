@@ -35,7 +35,7 @@ import (
 )
 
 const (
-	codexUserAgent             = "codex-tui/0.135.0 (Mac OS 26.5.0; arm64) iTerm.app/3.6.10 (codex-tui; 0.135.0)"
+	codexUserAgent             = "codex-tui/0.140.0 (Mac OS 26.5.1; arm64) iTerm2/3.6.11 (codex-tui; 0.140.0)"
 	codexOriginator            = "codex-tui"
 	codexDefaultImageToolModel = "gpt-image-2"
 )
@@ -1653,7 +1653,7 @@ func applyCodexHeaders(r *http.Request, auth *cliproxyauth.Auth, token string, s
 	}
 	if originator := strings.TrimSpace(ginHeaders.Get("Originator")); originator != "" {
 		r.Header.Set("Originator", originator)
-	} else if !isAPIKey {
+	} else if !isAPIKey || shouldDefaultCodexOriginator(r.Header.Get("User-Agent")) {
 		r.Header.Set("Originator", codexOriginator)
 	}
 	if !isAPIKey {
